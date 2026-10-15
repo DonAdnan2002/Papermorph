@@ -20,6 +20,7 @@ books/*/pages/
 /img/readme/*
 !/img/readme/logo.png
 !/img/readme/logo_light.png
+!/img/readme/fpga-ar/
 !/img/readme/papermorph-preview.gif
 !/img/readme/papermorph-preview.mp4
 /scripts/

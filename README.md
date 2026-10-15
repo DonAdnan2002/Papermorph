@@ -93,7 +93,24 @@ The Skill is not tied to one model. Books on the shelf show the results:
 
 ## Arabic edition | النسخة العربية
 
-This fork adds first-class **Arabic (RTL) support to the engine itself** — not a translation layer:
+This fork adds first-class **Arabic (RTL) support to the engine itself** — not a translation layer — and ships a complete example built with it: **the whole of a university FPGA course PDF (3 chapters, ~20 minutes, narrated in Arabic)**.
+
+| | | |
+|---|---|---|
+| ![قائمة الفصول](img/readme/fpga-ar/contents.jpg) | ![الفيوزات تحترق](img/readme/fpga-ar/ch01-fuse.jpg) | ![جدول البحث LUT](img/readme/fpga-ar/ch02-lut.jpg) |
+| الفهرس بالعربية | ch01 — الوصلات الفيوزية تحترق | ch02 — خلايا SRAM في جدول البحث |
+| ![شجرة الساعة](img/readme/fpga-ar/ch03-clock.jpg) | | |
+| ch03 — شجرة الساعة مقابل skew | | |
+
+Try it:
+
+```bash
+git clone https://github.com/DonAdnan2002/Papermorph.git
+cd Papermorph && python3 -m http.server 8765 -d site
+# open http://localhost:8765/fpga-ar/  (Arabic, RTL) — or /fpga/ for the English twin of ch01
+```
+
+What the engine gained:
 
 - A full Arabic interface table (engine + cover/contents) with all six Arabic plural forms via `Intl.PluralRules`
 - Right-to-left layout for the player bar, cards, grids, help and captions (`[dir='rtl']` rules in the engine stylesheets); Arabic letters keep their joins (letter-spacing is disabled where it would break them)
@@ -101,9 +118,7 @@ This fork adds first-class **Arabic (RTL) support to the engine itself** — not
 - `scripts/voices.py` in the Skill: audition narration voices side by side before committing to one
 - `engine/check_i18n.py` gained an `ar` variant (RTL page, mirrored cards, Arabic-layout shortcuts, plurals) while asserting English output stays byte-identical
 
-See it live in the bookshelf: `python3 -m http.server 8765 -d site` → `/fpga-ar/` (Arabic) and `/fpga/` (English) — an animated, narrated lesson built from a real FPGA course PDF.
-
-**النسخة العربية:** يضيف هذا التفرّع دعم العربية (الاتجاه من اليمين إلى اليسار) إلى محرك Papermorph نفسه: واجهة عربية كاملة، انعكاس حقيقي للبطاقات وشريط التشغيل والأسئلة، صيغ الجمع العربية، خطوط عربية مدمجة، وأداة اختبار أصوات السرد. جرّب الدرس العربي في `/fpga-ar/` بعد تشغيل الموقع محليًا.
+**النسخة العربية:** دعم العربية داخل محرك Papermorph نفسه — واجهة معرّبة كاملة، انعكاس RTL للبطاقات والشريط والأسئلة، صيغ الجمع، خطوط مدمجة، وأداة اختبار أصوات — مع مثال كامل: كتاب FPGA من ثلاثة فصول مُحوَّل عن PDF محاضرات جامعية، بالسرد الصوتي العربي والأسئلة التفاعلية.
 
 ## Official alternative
 
