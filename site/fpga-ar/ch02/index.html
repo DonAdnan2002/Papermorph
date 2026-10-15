@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>من البلاطات المنطقية إلى FPGA — الإلكترونيات الرقمية المتقدمة</title>
+<link rel="stylesheet" href="../lib/engine.css">
+<link rel="expect" href="#bar" blocking="render">
+<style>
+  .band .grid .row { grid-template-columns: 170px minmax(0, 1fr) 40px; }
+  .band .grid .why { padding-left: 0; padding-right: 186px; }
+  .screen .grid .row { grid-template-columns: 300px minmax(0, 1fr) 40px; }
+  .screen .grid .why { padding-left: 0; padding-right: 316px; }
+</style>
+</head>
+<body>
+<script src="../lib/engine.js"></script>
+<script src="audio/ar/timings.js"></script>
+<script>
+'use strict';
+const CHAPTER = { number: 2, title: 'من البلاطات المنطقية إلى FPGA', minutes: 6, language: 'ar', next: '../ch03/' };
+
+const LINK = COL.task, ON = COL.good, OFF = COL.bad, CFG = COL.whole, CHG = COL.int;
+const flipA = a => a === 'start' ? 'end' : a === 'end' ? 'start' : a;
+const mline = (p, parts, x, y, t0, fill = COL.chalk, size = 48, anchor = 'middle') => { const e = M(p, [].concat(parts), { x, y, size, fill, anchor: flipA(anchor), o: 0 }); show(e, t0); return e; };
+const text = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => { const e = T(p, str, { x, y, size, fill, anchor: flipA(anchor), weight, o: 0 }); show(e, t0); return e; };
+const box = (p, x, y, w, h, t0, colr = COL.chalk) => { const g = G(p, { o: 0 }); mk('rect', { x, y, width: w, height: h, rx: 10, fill: 'none', stroke: colr, 'stroke-width': 3.5 }, g); show(g, t0, .4); return g; };
+const flow = (parent, y, x0, x1, t0, dur, n = 3, colr = ON) => {
+  const dots = [];
+  for (let i = 0; i < n; i++) { const g = G(parent, { x: x0, y, o: 0 }); mk('circle', { r: 5, fill: colr }, g); dots.push(g); }
+  prog(q => { dots.forEach((d, i) => { st(d).x = x0 + ((q * 1.3 + i / n) % 1) * (x1 - x0); render(d); }); }, t0, dur, lin);
+  dots.forEach(d => { show(d, t0, .3); hide(d, t0 + dur, .3); });
+  return dots;
+};
+function icDie(p, x, y, w, h, t0, blank = true) {
+  const g = G(p, { o: 0 });
+  mk('rect', { x, y, width: w, height: h, rx: 10, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, g);
+  for (let i = 0; i < 5; i++) {
+    mk('circle', { cx: x + (i + .5) * w / 5, cy: y - 12, r: 4, fill: COL.dim }, g);
+    mk('circle', { cx: x + (i + .5) * w / 5, cy: y + h + 12, r: 4, fill: COL.dim }, g);
+  }
+  if (blank) for (let r = 0; r < 3; r++) for (let cc = 0; cc < 5; cc++)
+    mk('rect', { x: x + 28 + cc * (w - 56) / 4 - 26, y: y + 30 + r * (h - 60) / 2 - 20, width: 52, height: 40, rx: 6, fill: 'none', stroke: COL.dim, 'stroke-width': 2 }, g);
+  show(g, t0, .5);
+  return g;
+}
+/* مصفوفة AND–OR: أعمدة مداخل رأسية، صفوف AND أفقية، وأعمدة مخارج */
+function arrayPL(p, t0, andRows, outCols, programmableAnd, outNames = ['x', 'y', 'w']) {
+  const inXs = [], rowYs = [], outXs = [], c = { rows: [], ins: [], outs: [], andLinks: [], orLinks: [] };
+  const names = ['a', '!a', 'b', '!b', 'c', '!c'];
+  names.forEach((n, i) => inXs.push(330 + i * 62));
+  for (let i = 0; i < andRows; i++) rowYs.push(300 + i * 52);
+  for (let j = 0; j < outCols; j++) outXs.push(950 + j * 90);
+  // input pins and vertical rails
+  names.forEach((n, i) => {
+    const g = G(p, { o: 0 });
+    mk('circle', { cx: inXs[i] - 26, cy: 240, r: 8, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, g);
+    T(g, n, { x: inXs[i] - 26, y: 208, size: 32, font: MATH, fill: COL.chalk, anchor: 'middle' });
+    draw(path(g, `M${inXs[i] - 18} 240H${inXs[i]}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), t0 + i * .12, .3);
+    draw(path(p, `M${inXs[i]} 240V${rowYs[rowYs.length - 1] + 14}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), t0 + .2 + i * .12, .5);
+    c.ins.push(g); show(g, t0 + i * .12, .3);
+  });
+  // AND rows
+  rowYs.forEach((y, i) => {
+    const g = G(p, { o: 0 });
+    draw(path(g, `M${inXs[0] - 20} ${y}H${outXs[outXs.length - 1] + 30}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), t0 + 1 + i * .14, .4);
+    mk('path', { d: `M${outXs[outXs.length - 1] + 34} ${y - 16}h26l-13 32z`, fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 }, g);
+    show(g, t0 + 1 + i * .14, .35);
+    c.rows.push(g);
+  });
+  // links at crossings
+  const link = (x, y, t, prog0) => {
+    const g = G(p, { x, y, o: 0 });
+    if (prog0) path(g, 'M-7 -7L7 7M7 -7L-7 7', { stroke: COL.dim, 'stroke-width': 2.5 });
+    else mk('circle', { r: 5.5, fill: LINK }, g);
+    show(g, t, .25);
+    return g;
+  };
+  inXs.forEach((x, i) => { c.andLinks[i] = []; rowYs.forEach((y, r2) => { c.andLinks[i][r2] = link(x, y, t0 + 2 + (i * 6 + r2) * .03, programmableAnd); }); });
+  // output columns and their programmable links
+  outXs.forEach((x, j) => {
+    draw(path(p, `M${x} ${rowYs[0] - 14}V640H${x + 60}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), t0 + 3.2 + j * .2, .5);
+    c.outs.push(mline(p, outNames[j], x + 74, 646, t0 + 3.5 + j * .2, COL.chalk, 36));
+    rowYs.forEach((y, r2) => {
+      const g = G(p, { x, y, o: 0 });
+      path(g, 'M-7 -7L7 7M7 -7L-7 7', { stroke: COL.dim, 'stroke-width': 2.5 });
+      show(g, t0 + 3.6 + j * .2 + r2 * .04, .25);
+      if (!c.orLinks[j]) c.orLinks[j] = [];
+      c.orLinks[j].push(g);
+    });
+  });
+  c.planeLabels = [
+    text(p, 'مصفوفة AND', 620, 258, t0 + 1.2, { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 }),
+    text(p, 'مصفوفة OR', 1020, 258, t0 + 3.2, { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 }),
+  ];
+  c.inXs = inXs; c.rowYs = rowYs; c.outXs = outXs;
+  return c;
+}
+// وصلة تتحول من X إلى نقطة موصلة
+const connectX = (g, t0) => { const dot = mk('circle', { r: 7, fill: LINK }, g); st(dot).o = 0; tw(dot, { o: 1 }, t0, .3); pulse(g, t0, 1.2); };
+
+const BEATS = [
+  ['intro', 'من البلاطات المنطقية إلى FPGA', (m, D) => {
+    const g = G(scene, { o: 0, y: 24 });
+    T(g, 'الوحدة 1 · أساسيات FPGA · الفصل 2', { x: 800, y: 310, size: 28, fill: COL.dim, anchor: 'middle' });
+    T(g, 'من البلاطات المنطقية إلى FPGA', { x: 800, y: 420, size: 76, weight: 600, anchor: 'middle' });
+    T(g, 'PROM · PLA · CPLD · MUX · LUT', { x: 800, y: 505, size: 38, weight: 300, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 1, y: 0 }, .2, 1.1, out);
+    const r = text(scene, 'كيف نمت رقاقة قابلة للبرمجة حتى صارت FPGA؟', 800, 620, m('sub'), { size: 34, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+  }],
+
+  ['prom', 'PROM كمنطق', (m, D) => {
+    const p = panel(0);
+    const c = arrayPL(p, .4, 4, 1, false, ['y']);
+    const nFix = text(p, 'ثابتة: كل تركيبة تُفكَّك مسبقًا', 620, 660, m('fixed'), { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 });
+    // OR: the four product terms are all connected in a PROM
+    [0, 1, 2, 3].forEach(r2 => connectX(c.orLinks[0][r2], m('prog') + r2 * .18));
+    const nProg = text(p, 'قابلة للبرمجة: أنت تصل الحدود', 1020, 700, m('prog', 1), { size: 26, fill: LINK, anchor: 'middle', weight: 600 });
+    hide(nFix, m('sop'), .3); hide(nProg, m('sop', .2), .3);
+    const eq1 = mline(p, 'y = (a & !b & c) | (!a & b & c)', 800, 750, m('sop', .4), COL.chalk, 40);
+    const eq2 = mline(p, '| (a & !b & !c) | (a & !b & c)', 800, 800, m('sop', 1), COL.chalk, 40);
+    text(p, 'حدٌّ = حاصل ضرب رموز · والمجموع = مجموع الحواصل', 620, 660, m('sop', 1.4), { size: 25, fill: COL.dim, anchor: 'middle' });
+    hide(eq1, m('limit', 1.2), .3); hide(eq2, m('limit', 1.2), .3);
+    text(p, 'التكلفة: كل تركيبة تُفكَّك دائمًا — مداخل قليلة فقط', 800, 770, m('limit', 1.4), { size: 29, fill: OFF, anchor: 'middle', weight: 600 });
+  }],
+
+  ['pla', 'PLA: المصفوفتان معًا', (m, D) => {
+    const p = panel(0);
+    const c = arrayPL(p, .4, 3, 3, true, ['x', 'y', 'w']);
+    const nBoth = text(p, 'AND قابلة للبرمجة أيضًا: اربط ما تحتاجه فقط', 620, 680, m('both'), { size: 26, fill: LINK, anchor: 'middle', weight: 600 });
+    [[0, 0], [0, 1], [2, 0], [2, 1], [3, 2], [4, 0], [5, 1], [5, 2]].forEach(([col, row], i) => connectX(c.andLinks[col][row], m('both') + .3 + i * .1));
+    [0, 1, 2].forEach(j => [0, 1].forEach(r2 => connectX(c.orLinks[j][r2], m('eqs') + j * .2 + r2 * .1)));
+    hide(nBoth, m('eqs', .8), .3);
+    text(p, 'عدد دوال AND مستقل عن عدد المداخل — أضف صفًا تحصل على حدّ جديد', 620, 680, m('eqs', 1), { size: 26, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    mline(p, 'x = (a & b & c) | (!b & !c)', 340, 780, m('eqs'), COL.chalk, 34, 'start');
+    mline(p, 'y = (a & b & c)', 340, 830, m('eqs', .4), COL.chalk, 34, 'start');
+    mline(p, 'w = (a & c) | (!b & !c)', 340, 880, m('eqs', .8), COL.chalk, 34, 'start');
+  }],
+
+  ['cpld', 'CPLD', (m, D) => {
+    const p = panel(0);
+    const blocks = [];
+    [[220, 300], [620, 300], [420, 560]].forEach(([x, y], i) => {
+      const g = box(p, x, y, 280, 160, .4 + i * .2, COL.dim);
+      T(p, 'كتلة PLA', { x: x + 140, y: y + 90, size: 28, fill: COL.dim, anchor: 'middle', o: 0 });
+      show(T(p, 'كتلة PLA', { x: x + 140, y: y + 90, size: 28, fill: COL.dim, anchor: 'middle' }), .8 + i * .2, .3);
+      blocks.push(g);
+    });
+    const mesh = G(p, { o: 0 });
+    [[500, 380, 620, 380], [360, 460, 420, 560], [760, 460, 700, 560], [500, 460, 420, 460]].forEach(([x1, y1, x2, y2], i) =>
+      draw(path(mesh, `M${x1} ${y1}L${x2} ${y2}`, { stroke: CFG, 'stroke-width': 3, 'stroke-dasharray': '10 8' }, { d: 0 }), m('blocks') + i * .15, .4));
+    show(mesh, m('blocks'), .4);
+    text(p, 'وصلات قابلة للبرمجة تجمع الكتل على الرقاقة نفسها', 800, 790, m('blocks', 1), { size: 29, fill: CFG, anchor: 'middle', weight: 600 });
+  }],
+
+  ['sram', 'FPGAs قائمة على SRAM', (m, D) => {
+    const p = panel(0);
+    const die = icDie(p, 320, 300, 380, 260, .4);
+    const lab1 = text(p, 'فكرة جديدة تُجرَّب في دقائق — والمعايير تتطور بسهولة', 800, 640, m('adv'), { size: 28, fill: ON, anchor: 'middle', weight: 600 });
+    pulse(die, m('adv', .5), 1.04);
+    const s1 = T(p, 'اختبار ذاتي', { x: 510, y: 445, size: 30, fill: CHG, anchor: 'middle', weight: 700, o: 0 });
+    show(s1, m('selftest'), .4); pulse(s1, m('selftest', .4), 1.15);
+    hide(s1, m('selftest', 2.6), .4);
+    const s2 = T(p, 'المهمة الأساسية', { x: 510, y: 445, size: 30, fill: CFG, anchor: 'middle', weight: 700, o: 0 });
+    show(s2, m('selftest', 2.8), .4); pulse(s2, m('selftest', 3.2), 1.15);
+    const bootNote = text(p, 'تُبرمَج عند الإقلاع لاختبار اللوحة، ثم يُعاد برمجتها لمهمتها', 800, 640, m('selftest', 1.2), { size: 28, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    hide(lab1, m('selftest', 1.1), .3);
+    hide(s2, m('cost', -.2), .3);
+    const mem = box(p, 900, 330, 240, 180, m('cost'), CFG);
+    T(p, 'ذاكرة إعداد خارجية', { x: 1020, y: 425, size: 24, fill: CFG, anchor: 'middle', o: 0 });
+    show(T(p, 'ذاكرة إعداد خارجية', { x: 1020, y: 425, size: 24, fill: CFG, anchor: 'middle' }), m('cost', .4), .4);
+    draw(path(p, 'M900 420H704', { stroke: CFG, 'stroke-width': 4 }, { d: 0 }), m('cost', .8), .5);
+    flow(p, 420, 890, 710, m('cost', 1.3), 2.5, 3, CFG);
+    hide(bootNote, m('cost', 1.4), .3);
+    text(p, 'الثمن: الإعداد يضيع بانقطاع الطاقة — تُحمَّل من ذاكرة خارجية عند كل تشغيل', 800, 640, m('cost', 1.6), { size: 28, fill: OFF, anchor: 'middle', weight: 600 });
+  }],
+
+  ['mux', 'الكتلة المنطقية: طريقة MUX', (m, D) => {
+    const p = panel(0);
+    const mux = (x, y, w, h, t0) => { const g = G(p, { o: 0 }); mk('path', { d: `M${x} ${y}h${w / 2}l${w / 2} ${h / 2}l-${w / 2} ${h / 2}h-${w / 2}z`, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, g); show(g, t0, .4); return g; };
+    text(p, 'y = (a & b) | c', 800, 200, .3, { size: 40, fill: COL.chalk, anchor: 'middle' });
+    mux(430, 300, 160, 160, m('build'));
+    mux(430, 540, 160, 160, m('build', .3));
+    mux(830, 420, 220, 220, m('build', .8));
+    draw(path(p, 'M660 380Q740 380 830 470', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('build', 1.1), .5);
+    draw(path(p, 'M660 620Q740 620 830 590', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('build', 1.3), .5);
+    draw(path(p, 'M1050 530H1200', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('build', 1.5), .4);
+    mline(p, 'y', 1235, 542, m('build', 1.7), COL.chalk, 38);
+    // inputs: signals or constants
+    mline(p, 'a', 350, 380, m('build', 2), ON, 32);
+    mline(p, 'b', 350, 620, m('build', 2.1), ON, 32);
+    draw(path(p, 'M350 530Q390 530 390 560Q390 590 430 590', { stroke: COL.dim, 'stroke-width': 3 }, { d: 0 }), m('build', 2.2), .5);
+    mline(p, 'c', 330, 530, m('build', 2.3), ON, 32);
+    text(p, 'كل مدخل: 0 أو 1 أو إشارة صحيحة أو معكوسة', 800, 780, m('route'), { size: 29, fill: CFG, anchor: 'middle', weight: 600 });
+    flow(p, 380, 380, 640, m('route', .5), 3, 3);
+    flow(p, 380, 620, 640, m('route', .8), 3, 3);
+  }],
+
+  ['lut', 'الكتلة المنطقية: LUT', (m, D) => {
+    const p = panel(0);
+    text(p, 'y = (a & b) | c', 380, 190, .3, { size: 38, fill: COL.chalk, anchor: 'middle' });
+    // selector lines
+    ['a', 'b', 'c'].forEach((n, i) => {
+      mline(p, n, 120, 300 + i * 110, .5 + i * .15, ON, 32);
+      draw(path(p, `M140 ${300 + i * 110}H330`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), .6 + i * .15, .4);
+    });
+    // 8 SRAM cells
+    const vals = ['0', '1', '0', '1', '0', '1', '1', '1'];
+    const cells = [];
+    for (let i = 0; i < 8; i++) {
+      const g = G(p, { x: 400, y: 260 + i * 55, o: 0 });
+      mk('rect', { x: -30, y: -21, width: 60, height: 42, rx: 6, fill: 'none', stroke: CFG, 'stroke-width': 3 }, g);
+      T(g, vals[i], { size: 30, fill: CFG, anchor: 'middle', weight: 700 });
+      show(g, m('table') + i * .1, .3);
+      cells.push(g);
+    }
+    text(p, 'خلايا SRAM: النتيجة محمّلة مسبقًا', 560, 210, m('table'), { size: 25, fill: CFG, anchor: 'middle', weight: 600 });
+    // transmission gates cascade to output
+    draw(path(p, 'M460 285H620V410H700', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('table', 1), .5);
+    draw(path(p, 'M700 410H790', { stroke: COL.chalk, 'stroke-width': 5 }, { d: 0 }), m('table', 1.4), .4);
+    mline(p, 'y', 830, 422, m('table', 1.6), COL.chalk, 38);
+    // DE-2: the 4-input flow
+    text(p, 'لوحة DE-2 · داخل LUT واحدة', 1180, 190, m('flow'), { size: 30, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    mline(p, 'A B C D = 1 0 1 0', 1180, 250, m('flow', .4), CHG, 34);
+    const path41 = path(p, 'M1180 290V430', { stroke: CHG, 'stroke-width': 4, 'stroke-dasharray': '12 9' }, { d: 0 });
+    draw(path41, m('flow', .8), .7);
+    flow(p, 430, 1180, 1180, m('flow', 1.2), 3, 4, CHG);
+    mline(p, 'X فورًا — بدل شرائح 7400 كاملة', 1180, 490, m('flow', 2), ON, 30);
+    // the board numbers
+    const die = icDie(p, 950, 570, 300, 220, m('board'));
+    text(p, 'Cyclone EP2C35', 1100, 660, m('board', .4), { size: 26, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    mline(p, '33,216 LUT', 1100, 710, m('board', .7), LINK, 34);
+    mline(p, '475 طرف I/O', 1100, 755, m('board', 1), LINK, 34);
+    // volatility
+    const volLab = text(p, 'متطايرة: عند كل تشغيل تُعاد تهيئة الجداول والوصلات والسجلات', 800, 830, m('vol'), { size: 28, fill: OFF, anchor: 'middle', weight: 600 });
+    cells.forEach((g, i) => { if (i % 3 === 0) pulse(g, m('vol', .3 + i * .05), 1.1); });
+  }],
+
+  ['q1', 'تحقّق سريع', () => { panel(0); }, { ask: done => quiz(BAND, [{
+    id: 'c-arrays', prompt: ['أي مصفوفات قابلة للبرمجة في كل بلاطة؟'],
+    build: grid([
+      { parts: ['PROM'], ans: ['or'], why: 'AND ثابتة تُفكِّك كل تركيبة؛ OR وحدها قابلة للبرمجة.' },
+      { parts: ['PLA'], ans: ['and', 'or'], why: 'في PLA المصفوفتان كلتاهما قابلتان للبرمجة.' },
+    ], [['and', 'AND', OFF], ['or', 'OR', ON]]),
+  }], done) }],
+
+  ['wrap', 'خلاصة', (m) => {
+    const p = panel(0);
+    const rows = [
+      ['PROM: AND ثابتة + OR قابلة للبرمجة — حدود كثيرة ومداخل قليلة.', 'w1', LINK],
+      ['PLA: المصفوفتان معًا؛ وCPLD كتلٌ منها على رقاقة واحدة.', 'w2', CFG],
+      ['الكتلة المنطقية: MUX أو LUT — والـLUT هي التي تسود.', 'w3', CHG],
+      ['أغلب FPGAs على SRAM: سريعة التجديد، وتقلع من ذاكرة خارجية.', 'end', ON],
+    ];
+    rows.forEach(([str, mark, colr], i) => {
+      const g = G(p, { x: 16, y: 230 + i * 150, o: 0 });
+      mk('circle', { cx: 210, cy: -12, r: 26, fill: colr }, g);
+      T(g, String(i + 1), { x: 210, y: -1, size: 30, fill: COL.board, weight: 700, anchor: 'middle' });
+      T(g, str, { x: 280, size: 33, weight: 500, fill: COL.chalk, anchor: 'end' });
+      tw(g, { o: 1, x: 0 }, m(mark), .6);
+    });
+  }],
+
+  ['final1', 'تدريب الفصل', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+    { id: 'p-pld', prompt: ['علّم كل صفّ بما ينطبق عليه.'],
+      build: grid([
+        { parts: ['PROM'], ans: ['decodes'], why: 'تفكيك كل تركيبة دائمًا: مداخل قليلة، وحدود كثيرة متاحة.' },
+        { parts: ['PLA'], ans: ['free'], why: 'عدد دوال AND مستقل عن عدد المداخل.' },
+        { parts: ['CPLD'], ans: ['blocks'], why: 'كتل شبيهة بـPLA تجمعها وصلات قابلة للبرمجة.' },
+      ], [['decodes', 'تفكِّك كل تركيبة', OFF], ['free', 'عدد حدود حر', ON], ['blocks', 'كتل على رقاقة', CHG]], { text: true }) },
+    { id: 'p-many', prompt: ['دالة بثلاثة مداخل واثني عشر حدًّا. أي بلاطة تناسبها أكثر؟'],
+      build: choice([
+        'PROM — حدود كثيرة ومداخلها قليلة أصلًا',
+        'PLA بصفوف قليلة',
+        'CPLD بكتلة واحدة',
+        'antifuse وحده يكفي',
+      ], 0, 'صحيح: PROM تفكِّك ثلاثة مداخل إلى ثماني تركيبات وتنفذ أي عدد حدود — المشكلة تبدأ مع المداخل الكثيرة.', [
+        null, 'صفوف PLA محدودة بعدد دوال AND الموجودة فعليًا.',
+        'CPLD يجمع كتلًا، لكن بلاطته الداخلية تبقى محدودة الحدود.',
+        'الـantifuse تقنية برمجة، لا بنية منطقية.']) },
+    { id: 'p-vol', prompt: ['ماذا يحدث لجداول LUT عند انقطاع الطاقة؟'],
+      build: choice([
+        'تُفقد، ويُعاد تحميلها من الذاكرة الخارجية عند التشغيل',
+        'تبقى محفوظة إلى الأبد',
+        'تتحول تلقائيًا إلى antifuse',
+        'تُمحى بالأشعة البنفسجية',
+      ], 0, 'صحيح: خلايا SRAM متطايرة — لذا يقلع الـFPGA بتحميل الإعداد من جديد.', [
+        null, 'هذه خاصية الذاكرات غير المتطايرة، لا SRAM.',
+        'لا تحويل بين تقنيات البرمجة تلقائيًا.',
+        'الـUV يمحو EPROM، ولا علاقة له بجداول LUT.']) },
+  ], done, 'تدريب الفصل') }],
+
+  ['finish', 'انتهى', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>داخل FPGA الحديث — الإلكترونيات الرقمية المتقدمة</title>
+<link rel="stylesheet" href="../lib/engine.css">
+<link rel="expect" href="#bar" blocking="render">
+<style>
+  .band .grid .row { grid-template-columns: 170px minmax(0, 1fr) 40px; }
+  .band .grid .why { padding-left: 0; padding-right: 186px; }
+  .screen .grid .row { grid-template-columns: 300px minmax(0, 1fr) 40px; }
+  .screen .grid .why { padding-left: 0; padding-right: 316px; }
+</style>
+</head>
+<body>
+<script src="../lib/engine.js"></script>
+<script src="audio/ar/timings.js"></script>
+<script>
+'use strict';
+const CHAPTER = { number: 3, title: 'داخل FPGA الحديث', minutes: 7, language: 'ar' };
+
+const LINK = COL.task, ON = COL.good, OFF = COL.bad, CFG = COL.whole, CHG = COL.int;
+const flipA = a => a === 'start' ? 'end' : a === 'end' ? 'start' : a;
+const mline = (p, parts, x, y, t0, fill = COL.chalk, size = 48, anchor = 'middle') => { const e = M(p, [].concat(parts), { x, y, size, fill, anchor: flipA(anchor), o: 0 }); show(e, t0); return e; };
+const text = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => { const e = T(p, str, { x, y, size, fill, anchor: flipA(anchor), weight, o: 0 }); show(e, t0); return e; };
+const box = (p, x, y, w, h, t0, colr = COL.chalk, lw = 3.5) => { const g = G(p, { o: 0 }); mk('rect', { x, y, width: w, height: h, rx: 10, fill: 'none', stroke: colr, 'stroke-width': lw }, g); show(g, t0, .4); return g; };
+const flow = (parent, y, x0, x1, t0, dur, n = 3, colr = ON) => {
+  const dots = [];
+  for (let i = 0; i < n; i++) { const g = G(parent, { x: x0, y, o: 0 }); mk('circle', { r: 5, fill: colr }, g); dots.push(g); }
+  prog(q => { dots.forEach((d, i) => { st(d).x = x0 + ((q * 1.3 + i / n) % 1) * (x1 - x0); render(d); }); }, t0, dur, lin);
+  dots.forEach(d => { show(d, t0, .3); hide(d, t0 + dur, .3); });
+  return dots;
+};
+const wave = (p, x0, y, periods, cell, t0, colr, dur = 1) => {
+  // موجة مربعة: periods دورة، عرض الدورة cell بكسل
+  let d = `M${x0} ${y}`;
+  for (let i = 0; i < periods; i++) d += `H${x0 + i * cell + cell * .5}V${y - 36}H${x0 + (i + 1) * cell}V${y}`;
+  return draw(path(p, d, { stroke: colr, 'stroke-width': 3 }, { d: 0 }), t0, dur);
+};
+
+const BEATS = [
+  ['intro', 'داخل FPGA الحديث', (m, D) => {
+    const g = G(scene, { o: 0, y: 24 });
+    T(g, 'الوحدة 1 · أساسيات FPGA · الفصل 3', { x: 800, y: 310, size: 28, fill: COL.dim, anchor: 'middle' });
+    T(g, 'داخل FPGA الحديث', { x: 800, y: 420, size: 84, weight: 600, anchor: 'middle' });
+    T(g, 'من الخلية المنطقية حتى ملف الإعداد', { x: 800, y: 505, size: 38, weight: 300, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 1, y: 0 }, .2, 1.1, out);
+    const r = text(scene, 'جولة في معمارية الرقاقة: الخلايا، الذاكرات، الساعة، والأطراف', 800, 620, m('sub'), { size: 34, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+  }],
+
+  ['lc', 'الخلية المنطقية LC', (m, D) => {
+    const p = panel(0);
+    text(p, 'Xilinx: الخلية المنطقية LC', 800, 190, .3, { size: 30, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    box(p, 350, 250, 900, 420, .5);
+    const lut = box(p, 610, 300, 280, 160, m('lut'), CFG);
+    T(p, 'LUT ×4', { x: 750, y: 385, size: 34, fill: CFG, anchor: 'middle', weight: 700, o: 0 });
+    show(T(p, 'LUT ×4', { x: 750, y: 385, size: 34, fill: CFG, anchor: 'middle', weight: 700 }), m('lut', .3), .3);
+    const lutSpec = mline(p, '16×1 RAM · إزاحة 16 بت', 750, 500, m('lut', .8), CFG, 28);
+    // four inputs
+    for (let i = 0; i < 4; i++) draw(path(p, `M460 ${330 + i * 34}H610`, { stroke: ON, 'stroke-width': 3 }, { d: 0 }), m('lut', .2) + i * .1, .3);
+    text(p, '4 مداخل', 430, 330, m('lut', .5), { size: 24, fill: ON, anchor: 'middle' });
+    // mux + register
+    const mx = box(p, 920, 320, 110, 110, m('reg'), COL.dim, 2.5);
+    T(p, 'MUX', { x: 975, y: 385, size: 24, fill: COL.dim, anchor: 'middle', o: 0 });
+    show(T(p, 'MUX', { x: 975, y: 385, size: 24, fill: COL.dim, anchor: 'middle' }), m('reg', .3), .3);
+    draw(path(p, 'M890 385H920', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('reg', .2), .3);
+    const reg = box(p, 1060, 300, 140, 150, m('reg', .5), CHG);
+    T(p, 'سجل', { x: 1130, y: 370, size: 28, fill: CHG, anchor: 'middle', weight: 700, o: 0 });
+    show(T(p, 'سجل', { x: 1130, y: 370, size: 28, fill: CHG, anchor: 'middle', weight: 700 }), m('reg', .9), .3);
+    hide(lutSpec, m('reg', 1.1), .3);
+    text(p, 'flip-flop أو latch · قطبية الساعة وenable وreset قابلة للضبط', 800, 500, m('reg', 1.3), { size: 25, fill: COL.dim, anchor: 'middle' });
+    draw(path(p, 'M1030 385H1060', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('reg', .7), .3);
+    // fast carry
+    draw(path(p, 'M350 620H1250', { stroke: LINK, 'stroke-width': 4, 'stroke-dasharray': '14 10' }, { d: 0 }), m('carry'), .6);
+    text(p, 'منطق حمل سريع للعمليات الحسابية', 800, 690, m('carry', .5), { size: 26, fill: LINK, anchor: 'middle', weight: 600 });
+  }],
+
+  ['slice', 'الهرمية: slice وCLB', (m, D) => {
+    const p = panel(0);
+    // two LCs -> slice
+    const lc = (x, y, t0) => { const g = box(p, x, y, 130, 90, t0, CFG, 2.5); return g; };
+    lc(260, 300, .4); lc(410, 300, .5);
+    text(p, 'LC', 325, 355, .6, { size: 24, fill: CFG, anchor: 'middle', weight: 700 });
+    text(p, 'LC', 475, 355, .7, { size: 24, fill: CFG, anchor: 'middle', weight: 700 });
+    box(p, 240, 270, 320, 150, m('two'), COL.chalk);
+    const sl = T(p, 'slice', { x: 400, y: 465, size: 28, fill: COL.chalk, anchor: 'middle', weight: 700, o: 0 });
+    show(sl, m('two', .5), .3);
+    // 4 slices -> CLB
+    for (let i = 0; i < 4; i++) {
+      box(p, 660 + i * 100, 290, 84, 110, m('clb') + i * .12, COL.dim, 2.5);
+      if (i) draw(path(p, `M${660 + i * 100 - 16} 345H${660 + i * 100}`, { stroke: COL.dim, 'stroke-width': 2.5 }, { d: 0 }), m('clb', .5), .2);
+    }
+    box(p, 640, 260, 430, 170, m('clb', .8));
+    const clb = T(p, 'CLB', { x: 855, y: 470, size: 30, fill: COL.chalk, anchor: 'middle', weight: 700, o: 0 });
+    show(clb, m('clb', 1.2), .3);
+    text(p, 'شرائح: اثنتان أو أربع', 855, 515, m('clb', 1.5), { size: 24, fill: COL.dim, anchor: 'middle' });
+    // the sea of interconnect
+    const sea = G(p, { o: 0 });
+    for (let r = 0; r < 3; r++) for (let cc = 0; cc < 4; cc++)
+      mk('rect', { x: 380 + cc * 240, y: 590 + r * 90, width: 130, height: 60, rx: 8, fill: 'none', stroke: CFG, 'stroke-width': 2.5 }, sea);
+    for (let r = 0; r < 3; r++) for (let cc = 0; cc < 3; cc++)
+      draw(path(sea, `M${510 + cc * 240} ${620 + r * 90}H${620 + cc * 240}`, { stroke: COL.faint, 'stroke-width': 2, 'stroke-dasharray': '8 7' }, { d: 0 }), m('sea', .6) + (r * 3 + cc) * .05, .3);
+    for (let r = 0; r < 2; r++) draw(path(sea, `M445 ${650 + r * 90}V${680 + r * 90}`, { stroke: COL.faint, 'stroke-width': 2, 'stroke-dasharray': '8 7' }, { d: 0 }), m('sea', 1), .3);
+    show(sea, m('sea', .5), .5);
+    text(p, 'جزر CLBs في بحر من الوصلات القابلة للبرمجة', 800, 860, m('sea', 1.3), { size: 28, fill: CFG, anchor: 'middle', weight: 600 });
+  }],
+
+  ['lab', 'أسماء Altera', (m, D) => {
+    const p = panel(0);
+    text(p, 'المفهوم واحد — والأسماء لكل بائع', 800, 230, .3, { size: 32, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    box(p, 280, 320, 420, 260, .6);
+    text(p, 'Xilinx', 490, 390, .9, { size: 30, fill: CFG, anchor: 'middle', weight: 700 });
+    mline(p, 'LC → slice → CLB', 490, 470, 1.3, COL.chalk, 36);
+    box(p, 900, 320, 420, 260, 1.8);
+    text(p, 'Altera', 1110, 390, 2.1, { size: 30, fill: CFG, anchor: 'middle', weight: 700 });
+    mline(p, 'LE → LAB', 1110, 470, 2.5, COL.chalk, 36);
+    const eq = T(p, '=', { x: 800, y: 480, size: 60, fill: LINK, anchor: 'middle', weight: 700, o: 0 });
+    show(eq, m('names'), .4); pulse(eq, m('names', .4), 1.2);
+    text(p, 'خلية منطقية ثم كتلة — عند كل بائع اسمها', 800, 680, m('names', .8), { size: 27, fill: COL.dim, anchor: 'middle' });
+  }],
+
+  ['distr', 'ذاكرة موزعة وسجلات إزاحة', (m, D) => {
+    const p = panel(0);
+    // 4 LUTs merging into a RAM bar
+    const luts = [];
+    for (let i = 0; i < 4; i++) { const g = box(p, 260 + i * 110, 300, 90, 80, .4 + i * .12, CFG, 2.5); luts.push(g); }
+    text(p, 'LUTات CLB واحدة', 470, 430, 1, { size: 24, fill: CFG, anchor: 'middle' });
+    const ram = box(p, 760, 290, 380, 100, m('ram'), LINK);
+    mline(p, '16×8 · 32×4 · 64×2 · 128×1', 950, 350, m('ram', .5), LINK, 30);
+    text(p, 'أحادية المنفذ أو ثنائيته', 950, 430, m('ram', 1), { size: 24, fill: COL.dim, anchor: 'middle' });
+    for (let i = 0; i < 4; i++) draw(path(p, `M${305 + i * 110} 380Q${305 + i * 110} 340 760 340`, { stroke: COL.faint, 'stroke-width': 2.5 }, { d: 0 }), m('ram', .2) + i * .1, .4);
+    // shift register chain
+    const sq = [];
+    for (let i = 0; i < 8; i++) {
+      const g = G(p, { x: 340 + i * 100, y: 560, o: 0 });
+      mk('rect', { x: -32, y: -24, width: 64, height: 48, rx: 8, fill: 'none', stroke: CHG, 'stroke-width': 3 }, g);
+      sq.push(g); show(g, m('shift') + i * .09, .3);
+    }
+    const bit = G(p, { x: 340, y: 560, o: 0 });
+    mk('circle', { r: 9, fill: CHG }, bit);
+    show(bit, m('shift', 1), .3);
+    prog(q => { st(bit).x = 340 + Math.round(q * 7) * 100; render(bit); }, m('shift', 1.2), 3, lin);
+    text(p, 'كل LUT سجل إزاحة 16 بت — تُسلسل حتى 128 بتًا', 740, 680, m('shift', 1.6), { size: 26, fill: CHG, anchor: 'middle', weight: 600 });
+  }],
+
+  ['embed', 'كتل مدمجة وMAC', (m, D) => {
+    const p = panel(0);
+    // chip top view with RAM columns
+    box(p, 300, 270, 460, 400, .4);
+    for (let i = 0; i < 3; i++) { const g = box(p, 360 + i * 110, 320, 50, 300, .7 + i * .12, CFG, 2.5); pulse(g, 1 + i * .15, 1.05); }
+    text(p, 'أعمدة كتل RAM مدمجة', 530, 710, 1.5, { size: 25, fill: CFG, anchor: 'middle', weight: 600 });
+    // MAC: x, Σ, accumulator
+    const mul = box(p, 900, 300, 200, 120, m('mac'), LINK);
+    T(p, '×', { x: 1000, y: 378, size: 56, fill: LINK, anchor: 'middle', weight: 700, o: 0 });
+    show(T(p, '×', { x: 1000, y: 378, size: 56, fill: LINK, anchor: 'middle', weight: 700 }), m('mac', .3), .3);
+    mline(p, 'a', 900, 290, m('mac', .1), ON, 30);
+    mline(p, 'b', 1100, 290, m('mac', .2), ON, 30);
+    draw(path(p, 'M1000 420V470', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('mac', .4), .3);
+    const acc = box(p, 920, 470, 160, 110, m('mac', .6), CHG);
+    T(p, 'Σ', { x: 1000, y: 542, size: 50, fill: CHG, anchor: 'middle', weight: 700, o: 0 });
+    show(T(p, 'Σ', { x: 1000, y: 542, size: 50, fill: CHG, anchor: 'middle', weight: 700 }), m('mac', .9), .3);
+    draw(path(p, 'M1080 525H1160', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }), m('mac', 1.1), .3);
+    mline(p, 'مجامعة', 1250, 537, m('mac', 1.3), COL.chalk, 30);
+    text(p, 'MAC: اضرب ثم أضف إلى مجامعة جارية — قلب تطبيقات DSP', 800, 660, m('mac', 1.8), { size: 28, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  }],
+
+  ['tree', 'شجرة الساعة', (m, D) => {
+    const p = panel(0);
+    mline(p, 'CLK', 170, 330, .3, CHG, 32);
+    // long single path (bad)
+    draw(path(p, 'M220 330H1250', { stroke: OFF, 'stroke-width': 3.5 }, { d: 0 }), .5, .8);
+    [[350, 0], [650, 0], [950, 0], [1250, 0]].forEach(([x], i) => {
+      draw(path(p, `M${x} 330V250`, { stroke: OFF, 'stroke-width': 3 }, { d: 0 }), .9 + i * .12, .3);
+      mk('rect', { x: x - 26, y: 200, width: 52, height: 44, rx: 6, fill: 'none', stroke: OFF, 'stroke-width': 2.5 }, p);
+      mline(p, 'ns', x, 190, 1.6 + i * .2, OFF, 22);
+    });
+    const t1 = text(p, 'مسار واحد طويل: كل ماسكة تراها في وقت مختلف', 800, 440, 2.4, { size: 27, fill: OFF, anchor: 'middle', weight: 600 });
+    // the tree (good)
+    const tree = G(p, { o: 0 });
+    draw(path(tree, 'M220 620H420', { stroke: ON, 'stroke-width': 4 }, { d: 0 }), m('tree'), .4);
+    draw(path(tree, 'M420 540V700M420 540H760M420 700H760', { stroke: ON, 'stroke-width': 4 }, { d: 0 }), m('tree', .3), .5);
+    draw(path(tree, 'M760 500V740M760 500H1080M760 620H1080M760 740H1080', { stroke: ON, 'stroke-width': 4 }, { d: 0 }), m('tree', .6), .6);
+    show(tree, m('tree'), .3);
+    [[1080, 500], [1080, 620], [1080, 740]].forEach(([x, y], i) => {
+      const g = G(p, { x: x + 30, y: y - 22, o: 0 });
+      mk('rect', { width: 52, height: 44, rx: 6, fill: 'none', stroke: ON, 'stroke-width': 2.5 }, g);
+      show(g, m('tree', 1.1) + i * .1, .3);
+    });
+    text(p, 'جذع، ففروع، والأوراق flip-flops', 800, 560, m('tree', 1.5), { size: 26, fill: COL.dim, anchor: 'middle' });
+    hide(t1, m('skew', -.4), .3);
+    text(p, 'الشجرة: الجميع يرى الساعة معًا', 800, 440, m('skew'), { size: 28, fill: ON, anchor: 'middle', weight: 600 });
+    text(p, 'ns = زمن وصول مختلف عند كل ماسكة — skew', 800, 140, m('skew', .6), { size: 24, fill: OFF, anchor: 'middle' });
+  }],
+
+  ['mgr', 'مدير الساعة', (m, D) => {
+    const p = panel(0);
+    // jitter: fuzzy -> clean
+    text(p, 'إزالة الارتجاج', 400, 250, .4, { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 });
+    const jit = G(p, { o: 0 });
+    for (let i = 0; i < 3; i++) {
+      let d = `M200 ${350 + i * 7}H300`;
+      for (let k = 0; k < 4; k++) d += `V${310 + i * 7}H${340 + k * 40}V${350 + i * 7}H${360 + k * 40}`;
+      draw(path(jit, d, { stroke: OFF, 'stroke-width': 2.5, opacity: .8 }, { d: 0 }), .6 + i * .1, .6);
+    }
+    show(jit, .6, .3);
+    draw(path(p, 'M560 345H620', { stroke: COL.dim, 'stroke-width': 3 }, { d: 0 }), m('jitter'), .3);
+    wave(p, 640, 345, 4, 45, m('jitter', .3), ON, .7);
+    text(p, 'ساعة ضبابية ← بنات نظيفة', 400, 450, m('jitter', 1), { size: 25, fill: ON, anchor: 'middle', weight: 600 });
+    // frequency synthesis
+    text(p, 'توليد الترددات', 1150, 250, m('freq', -.5), { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 });
+    wave(p, 980, 330, 3, 60, m('freq'), COL.chalk, .5);
+    wave(p, 980, 430, 6, 30, m('freq', .5), CHG, .5);
+    wave(p, 980, 530, 1.5, 120, m('freq', 1), CFG, .5);
+    mline(p, 'f', 1440, 330, m('freq', .4), COL.chalk, 28);
+    mline(p, '2f', 1440, 430, m('freq', .9), CHG, 28);
+    mline(p, 'f/2', 1440, 530, m('freq', 1.4), CFG, 28);
+    // phase
+    text(p, 'إزاحة الطور', 400, 560, m('phase', -.5), { size: 26, fill: COL.dim, anchor: 'middle', weight: 600 });
+    [[0, COL.chalk, '0°'], [1, CHG, '90°'], [2, CFG, '180°'], [3, OFF, '270°']].forEach(([n, colr, lab], k) => {
+      const g = G(p, { o: 0 });
+      const x0 = 170 + (k % 2) * 260, y0 = 640 + Math.floor(k / 2) * 110, cellW = 180, lag = k * (cellW / 4);
+      // موجة مربعة تبقى منخفضة أولّ lag بكسل: تأخير الطور
+      let dd = `M${x0} ${y0}H${x0 + 20 + lag}`;
+      for (let c2 = 0; c2 < 2; c2++) dd += `V${y0 - 40}H${x0 + 20 + lag + (c2 + .5) * cellW - 20}V${y0}H${x0 + 20 + lag + (c2 + 1) * cellW - 20}`;
+      draw(path(g, dd, { stroke: colr, 'stroke-width': 3 }, { d: 0 }), m('phase') + k * .12, .5);
+      show(g, m('phase') + k * .12, .2);
+      const lb = T(p, lab, { x: x0 + 235, y: y0 - 6, size: 26, fill: colr, anchor: 'middle', weight: 700, o: 0 });
+      show(lb, m('phase', .5) + k * .12, .3);
+    });
+  }],
+
+  ['io', 'أطراف I/O', (m, D) => {
+    const p = panel(0);
+    const g = G(p, { o: 0 });
+    mk('rect', { x: 450, y: 260, width: 700, height: 440, rx: 18, fill: 'none', stroke: COL.chalk, 'stroke-width': 4 }, g);
+    show(g, .4, .5);
+    const hues = [COL.task, CFG, CHG, COL.good, COL.bad, COL.nat, COL.irr, COL.rat];
+    const seg = (x1, y1, x2, y2, k) => { const e = path(p, `M${x1} ${y1}L${x2} ${y2}`, { stroke: hues[k], 'stroke-width': 7 }, { d: 0, o: 0 }); draw(e, m('banks') + k * .15, .3); return e; };
+    seg(500, 260, 700, 260, 0); seg(700, 260, 900, 260, 1); seg(900, 260, 1100, 260, 2);
+    seg(500, 700, 700, 700, 3); seg(700, 700, 900, 700, 4); seg(900, 700, 1100, 700, 5);
+    seg(450, 320, 450, 420, 6); seg(450, 420, 450, 520, 7);
+    for (let i = 0; i < 8; i++) {
+      const ang = i * Math.PI / 4, x = 800 + Math.cos(ang) * 420, y = 480 + Math.sin(ang) * 240;
+      const lb = T(p, String(i), { x: x, y: y, size: 30, fill: hues[i], anchor: 'middle', weight: 700, o: 0 });
+      show(lb, m('banks', .6) + i * .08, .3);
+    }
+    text(p, 'ثمانية بنوك — كل بنك معيار إشارات مختلف', 800, 790, m('banks', 1), { size: 29, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    text(p, 'أكثر من 1000 طرف I/O عامة أسفل الغلاف', 800, 840, m('banks', 1.4), { size: 25, fill: COL.dim, anchor: 'middle' });
+  }],
+
+  ['flow', 'الإعداد وتدفق التصميم', (m, D) => {
+    const p = panel(0);
+    // bit file
+    const file = box(p, 180, 300, 260, 180, .4, LINK);
+    T(p, 'bit file', { x: 310, y: 380, size: 30, fill: LINK, anchor: 'middle', weight: 700, o: 0 });
+    show(T(p, 'bit file', { x: 310, y: 380, size: 30, fill: LINK, anchor: 'middle', weight: 700 }), .8, .3);
+    mline(p, '0 1 1 0 1 0 0 1', 310, 440, 1.1, COL.dim, 26);
+    text(p, 'بيانات إعداد + أوامر', 310, 530, m('bit'), { size: 25, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    const chip = box(p, 900, 280, 340, 220, m('bit', .5));
+    for (let r = 0; r < 3; r++) for (let cc = 0; cc < 5; cc++)
+      mk('rect', { x: 930 + cc * 60, y: 315 + r * 55, width: 46, height: 42, rx: 6, fill: 'none', stroke: COL.dim, 'stroke-width': 2 }, p);
+    text(p, 'FPGA', 1070, 545, m('bit', .8), { size: 26, fill: COL.dim, anchor: 'middle' });
+    draw(path(p, 'M460 390H880', { stroke: CFG, 'stroke-width': 4 }, { d: 0 }), m('stream'), .6);
+    flow(p, 390, 470, 870, m('stream', .4), 3, 5, CFG);
+    text(p, 'configuration bitstream — سيلُ بيتات أثناء التحميل', 670, 590, m('stream', 1), { size: 26, fill: CFG, anchor: 'middle', weight: 600 });
+    text(p, 'رقاقات antifuse: بيانات فقط — وصلاتها تنمو ولا تُحمَّل', 670, 640, m('stream', 1.6), { size: 24, fill: COL.dim, anchor: 'middle' });
+    // the 5-step design flow
+    const steps = ['صِف النظام', 'synthesis ← netlist', 'محاكاة وظيفية', 'تنفيذ على الموارد', 'إعداد الرقاقة'];
+    steps.forEach((st, i) => {
+      const g = G(p, { x: 200 + i * 260, y: 730, o: 0 });
+      mk('circle', { cx: 0, cy: 0, r: 24, fill: i === 4 ? ON : COL.dim }, g);
+      T(g, String(i + 1), { y: 9, size: 26, fill: COL.board, weight: 700, anchor: 'middle' });
+      T(p, st, { x: 200 + i * 260, y: 790, size: 22, fill: COL.chalk, anchor: 'middle', o: 0 });
+      show(T(p, st, { x: 200 + i * 260, y: 790, size: 22, fill: COL.chalk, anchor: 'middle' }), m('steps') + .2 + i * .25, .3);
+      show(g, m('steps') + i * .25, .3);
+      if (i < 4) draw(path(p, `M${228 + i * 260} 730H${434 + i * 260}`, { stroke: COL.faint, 'stroke-width': 2.5 }, { d: 0 }), m('steps', .5) + i * .25, .2);
+    });
+  }],
+
+  ['q1', 'تحقّق سريع', () => { panel(0); }, { ask: done => quiz(BAND, [{
+    id: 'c-tree', prompt: ['لماذا توزَّع الساعة شجرةً لا مسارًا واحدًا؟'],
+    build: choice([
+      'التزامن',
+      'توفير الأسلاك',
+      'الجمال',
+      'تقليل الماسكات',
+    ], 0, 'صحيح: المسار الواحد يوصل أقرب الماسكات قبل أبعدها — وskew يفسد التزامن.', [
+      null, 'الشجرة قد تستهلك أسلاكًا أكثر، لا أقل.',
+      'السبب هندسي وظيفي: التزامن.',
+      'عدد الماسكات لا علاقة له بشكل توزيع الساعة.']) ,
+  }], done) }],
+
+  ['wrap', 'خلاصة', (m) => {
+    const p = panel(0);
+    const rows = [
+      ['الهرمية: خلية بـLUT وسجل، فـslice، فـCLB — وعند Altera: LE وLAB.', 'w1', CFG],
+      ['الـLUT ذاكرة وسجل إزاحة، ومع كتل RAM وMAC تأتي قوة DSP.', 'w2', LINK],
+      ['شجرة الساعة ومديرها: وصول متزامن، بلا ارتجاج، وبأي تردد وطور.', 'w3', CHG],
+      ['أطراف I/O بنوك قابلة للضبط، والإعداد سيلُ بيتات: بيانات وأوامر.', 'end', ON],
+    ];
+    rows.forEach(([str, mark, colr], i) => {
+      const g = G(p, { x: 16, y: 230 + i * 150, o: 0 });
+      mk('circle', { cx: 210, cy: -12, r: 26, fill: colr }, g);
+      T(g, String(i + 1), { x: 210, y: -1, size: 30, fill: COL.board, weight: 700, anchor: 'middle' });
+      T(g, str, { x: 280, size: 33, weight: 500, fill: COL.chalk, anchor: 'end' });
+      tw(g, { o: 1, x: 0 }, m(mark), .6);
+    });
+  }],
+
+  ['final1', 'تدريب الفصل', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+    { id: 'p-lc', prompt: ['ماذا يوجد داخل الخلية المنطقية؟'],
+      build: grid([
+        { parts: ['LUT بأربعة مداخل'], ans: ['yes'], why: 'قلب الخلية: جدول بحث يصلح أيضًا ذاكرة 16×1 وسجل إزاحة.' },
+        { parts: ['سجل flip-flop'], ans: ['yes'], why: 'معه ماسك، وسجل قابل للضبط قطبيةً وإعدادًا.' },
+        { parts: ['منطق حمل سريح'], ans: ['yes'], why: 'في أركان الخلية، للعمليات الحسابية.' },
+        { parts: ['مئات الأطراف'], ans: ['no'], why: 'الأطراف على حواف الرقاقة وبنوكها، لا داخل الخلية.' },
+      ], [['yes', 'نعم', ON], ['no', 'لا', OFF]], { text: true }) },
+    { id: 'p-shift', prompt: ['أربع LUTات سلسلة إزاحة معًا: كم بتًا تحمل على الأكثر؟'],
+      build: blanks([{ parts: [{ box: '64' }], why: 'كل LUT سجل 16 بتًا: أربعُها 64 بتًا (وفي CLB كاملة حتى 128).', hint: '16 لكل واحدة.' }]) },
+    { id: 'p-bits', prompt: ['ماذا يحتوي ملف الإعداد bit file لرقاقة SRAM؟'],
+      build: choice([
+        'بيانات إعداد وأوامر إعداد معًا',
+        'بيانات فقط',
+        'أوامر فقط',
+        'صورة png للتصميم',
+      ], 0, 'صحيح: البيانات تحدد حالات الوصلات، والأوامر تقول للرقاقة ماذا تفعل بها — والسيل أثناء التحميل هو الـbitstream.', [
+        null, 'البيانات وحدها لا تكفي: الرقاقة تحتاج تعليمات التحميل.',
+        'بلا بيانات لا حالات تُضبط أصلًا.',
+        'التصميم يوصف بلغة وصف عتاد، ثم synthesis إلى netlist — لا صور.']) },
+  ], done, 'تدريب الفصل') }],
+
+  ['finish', 'انتهى', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+boot();
+</script>
+</body>
+</html>
