@@ -1,0 +1,11 @@
+/* This book's own settings. The engine files next to this one are shared; this file is not.
+   The Arabic edition: the interface text in IBM Plex Sans Arabic (vendored in fonts/), the big
+   serif titles in Noto Naskh Arabic. Selectors are more specific than the engine's, so they win. */
+@import url(fonts/fonts.css);
+:root {
+  --ui-font: "IBM Plex Sans Arabic", "Segoe UI", Arial, sans-serif;
+}
+:root .fin .prompt, :root .cover-t { font-family: "Noto Naskh Arabic", "Iowan Old Style", Palatino, Georgia, serif; }
+/* Stage labels are Arabic prose: render right-to-left. Equations are Latin and stay readable:
+   they are anchored middle, or pure LTR runs inside the line. */
+#stage text { direction: rtl; }

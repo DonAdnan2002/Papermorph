@@ -91,6 +91,20 @@ The Skill is not tied to one model. Books on the shelf show the results:
 - **GPT-6.1-Sol:** runs the Skill well. See *Elementary Mathematics*, chapters 4–20.
 - **Sonnet 5.5:** works, with some rough edges. See *Elementary Mathematics*, chapters 21–22.
 
+## Arabic edition | النسخة العربية
+
+This fork adds first-class **Arabic (RTL) support to the engine itself** — not a translation layer:
+
+- A full Arabic interface table (engine + cover/contents) with all six Arabic plural forms via `Intl.PluralRules`
+- Right-to-left layout for the player bar, cards, grids, help and captions (`[dir='rtl']` rules in the engine stylesheets); Arabic letters keep their joins (letter-spacing is disabled where it would break them)
+- `--ui-font`, a per-book setting for non-Latin interface fonts; the example book vendors IBM Plex Sans Arabic and Noto Naskh Arabic (both SIL OFL — licenses in `site/fpga-ar/lib/fonts/`)
+- `scripts/voices.py` in the Skill: audition narration voices side by side before committing to one
+- `engine/check_i18n.py` gained an `ar` variant (RTL page, mirrored cards, Arabic-layout shortcuts, plurals) while asserting English output stays byte-identical
+
+See it live in the bookshelf: `python3 -m http.server 8765 -d site` → `/fpga-ar/` (Arabic) and `/fpga/` (English) — an animated, narrated lesson built from a real FPGA course PDF.
+
+**النسخة العربية:** يضيف هذا التفرّع دعم العربية (الاتجاه من اليمين إلى اليسار) إلى محرك Papermorph نفسه: واجهة عربية كاملة، انعكاس حقيقي للبطاقات وشريط التشغيل والأسئلة، صيغ الجمع العربية، خطوط عربية مدمجة، وأداة اختبار أصوات السرد. جرّب الدرس العربي في `/fpga-ar/` بعد تشغيل الموقع محليًا.
+
 ## Official alternative
 
 Claude now offers official animated explainers ([Claude Motion](https://claude.com/resources/articles/dashboards-and-motion), in beta), which overlap with much of what this Skill does. For token efficiency, the official tool may be the better choice.

@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Programming Technologies — Advanced Digital Electronics</title>
+<link rel="stylesheet" href="../lib/engine.css">
+<link rel="expect" href="#bar" blocking="render"><!-- hold the first frame until the player exists, so the page transition can run -->
+<style>
+  .band .grid .row { grid-template-columns: 170px minmax(0, 1fr) 40px; }
+  .band .grid .why { padding-left: 186px; }
+  .screen .grid .row { grid-template-columns: 300px minmax(0, 1fr) 40px; }
+  .screen .grid .why { padding-left: 316px; }
+</style>
+</head>
+<body>
+<script src="../lib/engine.js"></script>
+<script src="audio/en/timings.js"></script>
+<script>
+'use strict';
+const CHAPTER = { number: 1, title: 'Programming Technologies', minutes: 8, language: 'en' };
+
+/* ---------- palette meanings (books/fpga/style.json) ---------- */
+const LINK = COL.task;    // a made connection: copper, a fuse, a grown antifuse
+const ON = COL.good;      // logic 1, current flowing, an enabled switch
+const OFF = COL.bad;      // blown, removed, open, blocked
+const CFG = COL.whole;    // SRAM cell, configuration data
+const CHG = COL.int;      // electrons, charge, UV light, high voltage
+
+/* ---------- shared drawing helpers ---------- */
+const mline = (p, parts, x, y, t0, fill = COL.chalk, size = 48, anchor = 'middle') => { const e = M(p, [].concat(parts), { x, y, size, fill, anchor, o: 0 }); show(e, t0); return e; };
+const text = (p, str, x, y, t0, { size = 30, fill = COL.chalk, anchor = 'start', weight = 500 } = {}) => { const e = T(p, str, { x, y, size, fill, anchor, weight, o: 0 }); show(e, t0); return e; };
+
+/* The chapter's recurring picture: the smallest programmable function.
+   Two inputs a and b, each also inverted, four rails, one AND gate, and a link in
+   series with every rail. mode: 'blank' (dashed potential links), 'fuse', 'anti'. */
+const RY = { a: 330, na: 430, b: 540, nb: 640 };
+const RAIL_END = 950, STUB0 = 1020, STUB1 = 1080, GATE_X = 1080;
+
+function pfn(parent, mode, t0) {
+  const step = .14, c = { links: {}, pulls: {}, ones: {}, rails: {}, labels: {} };
+  const rail = (y, x0, dt) => { const e = path(parent, `M${x0} ${y}H${RAIL_END}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }); draw(e, t0 + dt, .5); return e; };
+  const pin = (x, y, lab, dt) => {
+    const g = G(parent, { o: 0 });
+    mk('circle', { cx: x, cy: y, r: 8, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, g);
+    T(g, lab, { x: x - 4, y: y - 26, size: 40, font: MATH, fill: COL.chalk, anchor: 'middle' });
+    show(g, t0 + dt, .3);
+  };
+  const notG = (x, y1, y2, dt) => {
+    const g = G(parent, { o: 0 });
+    path(g, `M${x} ${y1}V${y1 + 45}`, { stroke: COL.chalk, 'stroke-width': 3 });
+    path(g, `M${x - 14} ${y1 + 45}H${x + 14}L${x} ${y1 + 74}Z`, { fill: 'none', stroke: COL.chalk, 'stroke-width': 3 });
+    mk('circle', { cx: x, cy: y1 + 80, r: 5.5, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, g);
+    path(g, `M${x} ${y1 + 86}V${y2}`, { stroke: COL.chalk, 'stroke-width': 3 });
+    show(g, t0 + dt, .35);
+  };
+  // rails: a from its pin, !a from the inverter output; same for b / !b
+  c.rails.a = rail(RY.a, 190, 0); pin(178, RY.a, 'a', 0);
+  notG(560, RY.a, RY.na, .9); c.rails.na = rail(RY.na, 560, 1.1);
+  c.rails.b = rail(RY.b, 190, 1.7); pin(178, RY.b, 'b', 1.7);
+  notG(680, RY.b, RY.nb, 2.6); c.rails.nb = rail(RY.nb, 680, 2.8);
+  for (const k in RY) c.labels[k] = mline(parent, k === 'na' ? '!a' : k === 'nb' ? '!b' : k, RAIL_END - 34, RY[k] - 20, t0 + 3.2, COL.dim, 32, 'end');
+  // AND gate
+  const gG = G(parent, { o: 0 });
+  const body = path(gG, `M${GATE_X} 300V670C1200 670 1290 600 1290 485C1290 370 1200 300 ${GATE_X} 300Z`, { fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, { d: 0 });
+  draw(body, t0 + 3.4, .7);
+  T(gG, 'AND', { x: 1140, y: 497, size: 30, fill: COL.dim, anchor: 'middle', weight: 600, o: 0 });
+  const stub = (k, dt) => path(parent, `M${STUB0} ${RY[k]}H${STUB1}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0, o: 0 });
+  for (const k in RY) { const e = stub(k); draw(e, t0 + 3.8, .3); }
+  show(gG, t0 + 3.8, .4);
+  const out = path(parent, 'M1290 485H1408', { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 });
+  draw(out, t0 + 4.1, .4);
+  mk('circle', { cx: 1416, cy: 485, r: 8, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, parent);
+  c.ypin = mline(parent, 'y', 1452, 498, t0 + 4.3, COL.chalk, 42, 'middle');
+  // the links, one per rail, in the gap
+  for (const k in RY) {
+    const g = G(parent, { x: 985, y: RY[k], o: 0 });
+    path(g, 'M-35 0H-27M27 0H35', { stroke: COL.chalk, 'stroke-width': 3 });
+    if (mode === 'fuse') c.links[k] = mk('rect', { x: -27, y: -5, width: 54, height: 10, rx: 3, fill: LINK }, g);
+    else if (mode === 'anti') { path(g, 'M-10 -10L10 10M10 -10L-10 10', { stroke: OFF, 'stroke-width': 3.5 }); c.links[k] = g; }
+    else { path(g, 'M-27 0H27', { stroke: COL.dim, 'stroke-width': 3, 'stroke-dasharray': '9 8' }); c.links[k] = g; }
+    show(g, t0 + 4.6, .4);
+  }
+  // pull-up resistor above each stub (hidden until asked for)
+  for (const k in RY) {
+    const g = G(parent, { x: 1050, y: RY[k], o: 0 });
+    path(g, 'M0 -4l-7 -7 14 -10-14 -10 14 -10-14 -10 7 -7', { stroke: COL.dim, 'stroke-width': 2.5, fill: 'none' });
+    path(g, 'M-11 -68H11', { stroke: COL.dim, 'stroke-width': 3 });
+    c.pulls[k] = g;
+  }
+  // small value chips on the gate inputs (hidden until asked for)
+  for (const k in RY) c.ones[k] = T(parent, '1', { x: 1050, y: RY[k] - 16, size: 30, fill: ON, anchor: 'middle', o: 0 });
+  return c;
+}
+// current dots flowing left→right along a rail, inside [t0, t0+dur]
+function flow(parent, y, x0, x1, t0, dur, n = 3, colr = ON) {
+  const dots = [];
+  for (let i = 0; i < n; i++) {
+    const g = G(parent, { x: x0, y, o: 0 });
+    mk('circle', { r: 5, fill: colr }, g);
+    dots.push(g);
+  }
+  prog(q => { dots.forEach((d, i) => { st(d).x = x0 + ((q * 1.3 + i / n) % 1) * (x1 - x0); render(d); }); }, t0, dur, lin);
+  dots.forEach(d => { show(d, t0, .3); hide(d, t0 + dur, .3); });
+  return dots;
+}
+// an OTP rubber stamp
+function stamp(p, x, y, t0) {
+  const g = G(p, { x, y, r: -22, s: 1.6, o: 0 });
+  mk('rect', { x: -215, y: -38, width: 430, height: 76, rx: 10, fill: 'none', stroke: OFF, 'stroke-width': 4 }, g);
+  T(g, 'ONE-TIME PROGRAMMABLE', { size: 30, fill: OFF, weight: 700, anchor: 'middle', x: 0, y: 10, 'letter-spacing': '2' });
+  tw(g, { o: 1, r: -8, s: 1 }, t0, .45, back);
+  return g;
+}
+// a lightning bolt (high voltage, electrical erase)
+function bolt(p, x, y, t0, size = 1) {
+  const g = G(p, { x, y, s: 0, o: 0 });
+  path(g, 'M14 -48L-14 6H4L-10 48L22 -10H2L18 -48Z', { fill: CHG, stroke: 'none' });
+  pop(g, t0);
+  return g;
+}
+// a small integrated-circuit die
+function icDie(p, x, y, w, h, t0, blank = false) {
+  const g = G(p, { o: 0 });
+  mk('rect', { x, y, width: w, height: h, rx: 10, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, g);
+  for (let i = 0; i < 5; i++) {
+    mk('circle', { cx: x + (i + .5) * w / 5, cy: y - 12, r: 4, fill: COL.dim }, g);
+    mk('circle', { cx: x + (i + .5) * w / 5, cy: y + h + 12, r: 4, fill: COL.dim }, g);
+  }
+  if (blank) {   // FPGA: a grid of empty logic blocks
+    for (let r = 0; r < 3; r++) for (let cc = 0; cc < 5; cc++)
+      mk('rect', { x: x + 28 + cc * (w - 56) / 4 - 26, y: y + 30 + r * (h - 60) / 2 - 20, width: 52, height: 40, rx: 6, fill: 'none', stroke: COL.dim, 'stroke-width': 2 }, g);
+  } else {       // ASIC: fixed tracing
+    path(g, `M${x + 22} ${y + 24}h${w - 44}v${h / 3}h-${w / 2}v${h / 3}h${w - 44}`, { fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 });
+    path(g, `M${x + 22} ${y + h - 24}h${w - 44}v-${h / 3}h-${w / 2}v-${h / 3}`, { fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 });
+  }
+  show(g, t0, .5);
+  return g;
+}
+
+/* ---------- beats: [id, title, run(m, D), { ask }?] ---------- */
+const BEATS = [
+  ['intro', 'Programming Technologies', (m, D) => {
+    const g = G(scene, { o: 0, y: 24 });
+    T(g, 'Unit 1 · FPGA Fundamentals · Chapter 1', { x: 800, y: 310, size: 28, fill: COL.dim, anchor: 'middle' });
+    T(g, 'Programming Technologies', { x: 800, y: 420, size: 84, weight: 600, anchor: 'middle' });
+    T(g, 'from fuses to SRAM', { x: 800, y: 505, size: 40, weight: 300, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 1, y: 0 }, .2, 1.1, out);
+    const r = text(scene, 'How do you program a chip that is already built?', 800, 620, m('sub'), { size: 34, fill: COL.dim, anchor: 'middle' });
+    tw(g, { o: 0, y: -24 }, D - .9, .8); hide(r, D - .9, .8);
+  }],
+
+  ['idea', 'ASIC, FPGA, and the link', (m, D) => {
+    const p = panel(0);
+    // two dice: the ASIC wired at the factory, the FPGA a blank grid
+    const fdie = icDie(p, 260, 300, 300, 230, .4);
+    const fl1 = text(p, 'ASIC — one job, wired at the factory', 410, 590, 1.1, { size: 27, fill: COL.dim, anchor: 'middle' });
+    const bdie = icDie(p, 700, 300, 340, 230, m('asic'), true);
+    const fl2 = text(p, 'FPGA — a blank grid of logic blocks', 870, 590, m('asic', .8), { size: 27, fill: COL.dim, anchor: 'middle' });
+    pulse(bdie, m('asic', 1.2), 1.06);
+    // "in the field": three arrows reach the FPGA from outside
+    const arrows = G(p, { o: 0 });
+    [[640, 160, 730, 290], [1150, 160, 1000, 300], [1150, 660, 1020, 540]].forEach(([x1, y1, x2, y2]) => {
+      path(arrows, `M${x1} ${y1}L${x2} ${y2}`, { stroke: CFG, 'stroke-width': 3 });
+      mk('circle', { cx: x2, cy: y2, r: 7, fill: CFG }, arrows);
+    });
+    show(arrows, m('field'), .5);
+    const fieldNote = text(p, 'configured in the field — lab, or a running system', 870, 700, m('field', .6), { size: 27, fill: CFG, anchor: 'middle', weight: 600 });
+    tw(fdie, { o: 0 }, m('field', 4.4), .7); tw(bdie, { o: 0 }, m('field', 4.6), .7); hide(arrows, m('field', 4.4), .6); hide(fieldNote, m('field', 4.4), .6); hide(fl1, m('field', 4.4), .6); hide(fl2, m('field', 4.4), .6);
+    // build the smallest programmable function
+    const t = m('field', 5.6);
+    const c = pfn(p, 'blank', t);
+    // pull-ups hold the gate inputs at one
+    for (const k in RY) { show(c.pulls[k], m('pull'), .4); show(c.ones[k], m('pull', .5), .4); }
+    mline(p, 'y = 1', 1180, 790, m('pull', 1.4), OFF, 44);
+    const pullNote = text(p, 'pull-ups hold every gate input at 1', 620, 770, m('pull', 1.8), { size: 27, fill: COL.dim, anchor: 'middle' });
+    // the question: the links themselves
+    const qs = G(p, { o: 0 });
+    const qms = [];
+    for (const k in RY) { const g = G(qs, { x: 985, y: RY[k] - 34, o: 0 }); T(g, '?', { size: 44, fill: LINK, weight: 700, anchor: 'middle' }); qms.push(g); }
+    qms.forEach((g, i) => { show(g, m('question') + i * .12, .4); pulse(g, m('question', .5) + i * .12, 1.15); });
+    hide(pullNote, m('question', .6), .4);
+    text(p, 'make — or break — a connection inside silicon', 620, 770, m('question', .8), { size: 29, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  }],
+
+  ['fuse', 'Fusible links', (m, D) => {
+    const p = panel(0);
+    S.circ = G(scene);
+    const c = pfn(S.circ, 'fuse', .3);
+    const pd = p;   // decorations live on the panel, the circuit on S.circ (it stays for the quick check)
+    // unprogrammed: one of each pair is always 0
+    tw(c.rails.a, { c_stroke: OFF }, m('stuck'), .5); tw(c.rails.na, { c_stroke: OFF }, m('stuck', .2), .5);
+    tw(c.rails.b, { c_stroke: OFF }, m('stuck', .4), .5); tw(c.rails.nb, { c_stroke: OFF }, m('stuck', .6), .5);
+    const y0v = mline(pd, 'y = 0', 1180, 790, m('stuck', 1.6), OFF, 44);
+    const noteD = text(pd, 'each input arrives twice — one of them is always 0', 620, 770, m('stuck', 2), { size: 27, fill: COL.dim, anchor: 'middle' });
+    // the programming pulse comes in
+    bolt(pd, 90, 430, m('blow', -2), 1.2);
+    const hvLab = T(pd, 'HV pulse', { x: 90, y: 520, size: 24, fill: CHG, weight: 600, anchor: 'middle', o: 0 });
+    show(hvLab, m('blow', -1.9), .3);
+    // fuses blow: not-a, then b
+    const blowFuse = (k, t0) => {
+      const g = c.links[k].parentNode;
+      const spark = path(g, 'M-15 -15L15 15M15 -15L-15 15', { stroke: CHG, 'stroke-width': 3.5 }, { o: 0 });
+      show(spark, t0, .12); hide(spark, t0 + .35, .25);
+      tw(c.links[k], { s: 0, o: 0 }, t0 + .15, .3);
+      pulse(g, t0, 1.25);
+      return g;
+    };
+    blowFuse('na', m('blow'));
+    blowFuse('b', m('blow', 1.5));
+    // pull-ups take over on the broken rows
+    for (const k of ['na', 'b']) { show(c.pulls[k], m('pull'), .4); show(c.ones[k], m('pull', .5), .4); }
+    for (const k of ['a', 'nb']) tw(c.links[k], { c_fill: ON }, m('pull', .9), .6);
+    flow(S.circ, RY.a, 200, STUB0, m('pull', 1.4), 4.5);
+    flow(S.circ, RY.nb, 700, STUB0, m('pull', 1.8), 4.2);
+    // the function, and a live case: a = 1, b = 0
+    hide(noteD, m('fn', -.1), .4);
+    mline(pd, 'y = a & !b', 800, 790, m('fn'), COL.chalk, 50);
+    mline(pd, 'a = 1', 150, 240, m('fn', 1.2), ON, 34);
+    mline(pd, 'b = 0', 150, 700, m('fn', 1.2), COL.dim, 34);
+    hide(y0v, m('fn', 2.2), .4);
+    const y1 = mline(pd, 'y = 1', 1180, 790, m('fn', 2.4), ON, 44);
+    pulse(y1, m('fn', 2.6), 1.18);
+    stamp(pd, 1240, 140, D - 5.2);
+  }],
+
+  ['q1', 'Quick check', () => { panel(0); }, { ask: done => quiz(BAND, [{
+    id: 'c-fuses', prompt: ['The fuses are all intact. For ', h('b', '', 'y = !a & b'), ', mark each fuse: burn it open, or keep it.'],
+    build: grid([
+      { parts: ['a'], ans: ['burn'], why: 'a must not reach the gate — in y = !a & b only !a and b drive the AND.' },
+      { parts: ['!a'], ans: ['keep'], why: 'not-a drives the gate: keep its fuse.' },
+      { parts: ['b'], ans: ['keep'], why: 'b drives the gate: keep its fuse.' },
+      { parts: ['!b'], ans: ['burn'], why: 'not-b must not reach the gate — burn its fuse open.' },
+    ], [['burn', 'burn open', OFF], ['keep', 'keep', ON]]),
+  }], done) }],
+
+  ['antifuse', 'Antifuse', (m, D) => {
+    hide(S.circ, 0, .4);
+    const p = panel(0);
+    S.circ = G(scene);
+    const c = pfn(S.circ, 'anti', .3);
+    mline(p, 'y = 1', 1180, 790, m('open', 1.5), OFF, 44);
+    const afNote = text(p, 'every gate input reads 1', 620, 770, m('open', 2), { size: 27, fill: COL.dim, anchor: 'middle' });
+    // inset: the antifuse cross-section, before and after programming
+    const ins = G(p, { o: 0 });
+    mk('rect', { x: 70, y: 80, width: 430, height: 240, rx: 12, fill: 'none', stroke: COL.faint, 'stroke-width': 2 }, ins);
+    text(p, 'a microscopic column between two metal tracks', 285, 112, m('open'), { size: 24, fill: COL.dim, anchor: 'middle' });
+    path(ins, 'M110 160H460', { stroke: COL.chalk, 'stroke-width': 6 });
+    path(ins, 'M110 250H460', { stroke: COL.chalk, 'stroke-width': 6 });
+    const pillar = mk('rect', { x: 268, y: 160, width: 34, height: 90, fill: COL.faint }, ins);
+    const siLab = T(p, 'amorphous silicon', { x: 285, y: 300, size: 22, fill: COL.dim, anchor: 'middle', o: 0 });
+    show(siLab, m('open', .6), .4);
+    const rzNote = text(p, 'resistance > 1 GΩ — a break in the wire', 285, 336, m('open', 1.1), { size: 23, fill: OFF, anchor: 'middle', weight: 600 });
+    show(ins, m('open'), .4);
+    // grow the vias
+    const grow = (k, t0) => {
+      const g = c.links[k];
+      pulse(g, t0, 1.25);
+      const bar = path(g, 'M-35 0H35', { stroke: LINK, 'stroke-width': 7 }, { d: 0 });
+      draw(bar, t0 + .25, .45);
+    };
+    grow('na', m('grow'));
+    grow('b', m('grow', 1.6));
+    tw(pillar, { c_fill: LINK }, m('grow', .3), .6);
+    hide(rzNote, m('grow', .45), .4);
+    text(p, 'programmed: polysilicon via — it conducts', 285, 336, m('grow', .5), { size: 23, fill: LINK, anchor: 'middle', weight: 600 });
+    flow(S.circ, RY.na, 570, STUB0, m('grow', 2.3), 4);
+    flow(S.circ, RY.b, 200, STUB0, m('grow', 2.7), 3.6);
+    hide(afNote, m('fn', -.3), .4);
+    mline(p, 'y = !a & b', 800, 790, m('fn'), COL.chalk, 50);
+    stamp(p, 1240, 140, D - 4.4);
+  }],
+
+  ['rom', 'ROM: wired at the factory', (m, D) => {
+    const p = panel(0);
+    if (S.circ) hide(S.circ, 0, .4);
+    // two memories: RAM forgets, ROM remembers
+    const ram = icDie(p, 250, 280, 300, 200, .3);
+    text(p, 'RAM — volatile', 400, 540, .9, { size: 27, fill: COL.dim, anchor: 'middle' });
+    const romd = icDie(p, 700, 280, 300, 200, 1.2);
+    text(p, 'ROM — nonvolatile', 850, 540, 1.8, { size: 27, fill: COL.dim, anchor: 'middle' });
+    const dots = G(p, { o: 0 });
+    for (let i = 0; i < 6; i++) mk('circle', { cx: 300 + (i % 3) * 90, cy: 340 + Math.floor(i / 3) * 70, r: 6, fill: CHG }, dots);
+    show(dots, 1.6, .4); hide(dots, 10.2, .8);
+    text(p, 'power off → RAM forgets', 400, 250, 10.6, { size: 25, fill: OFF, anchor: 'middle', weight: 600 });
+    text(p, 'ROM remembers', 850, 250, 12.4, { size: 25, fill: ON, anchor: 'middle', weight: 600 });
+    tw(ram, { o: .3 }, 10.2, .8);
+    // the photo-mask wires the data in
+    const mask = G(p, { o: 0 });
+    mk('rect', { x: 1030, y: 250, width: 330, height: 230, rx: 8, fill: 'none', stroke: COL.faint, 'stroke-width': 6 }, mask);
+    mk('rect', { x: 1030, y: 250, width: 330, height: 230, rx: 8, fill: COL.faint, opacity: .18 }, mask);
+    [[1090, 300], [1210, 360], [1290, 420]].forEach(([x, y]) => mk('circle', { cx: x, cy: y, r: 13, fill: COL.board }, mask));
+    show(mask, m('mask'), .5);
+    text(p, 'photo-masks wire the data in', 1195, 570, m('mask', .6), { size: 25, fill: COL.dim, anchor: 'middle' });
+    tw(ram, { o: 0 }, m('mask'), .6); tw(romd, { o: 0 }, m('mask'), .6); hide(mask, m('mask', 3), .6);
+    // the ROM array
+    const rows = [400, 470, 540, 610], cols = [520, 740, 960];
+    const arr = G(p, { o: 0 });
+    rows.forEach((y, i) => { const e = path(arr, `M330 ${y}H${cols[2] + 40}`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }); draw(e, m('mask', 3.6 + i * .25), .4); T(arr, `R${i}`, { x: 300, y: y + 10, size: 28, font: MATH, fill: COL.dim, anchor: 'end' }); });
+    cols.forEach((x, i) => { const e = path(arr, `M${x} 610V350`, { stroke: COL.chalk, 'stroke-width': 3 }, { d: 0 }); draw(e, m('mask', 4.4 + i * .25), .4); });
+    show(arr, m('mask', 3.6), .3);
+    const pullG = G(p, { o: 0 });
+    cols.forEach(x => { const g = G(pullG, { x, y: 350 }); path(g, 'M0 -4l-6 -6 12 -9-12 -9 12 -9-6 -6', { stroke: COL.dim, 'stroke-width': 2.5, fill: 'none' }); path(g, 'M-9 -49H9', { stroke: COL.dim, 'stroke-width': 3 }); });
+    show(pullG, m('cell', -3), .4);
+    // transistors at every crossing; a mask connection on three cells
+    const conn = [[1, 0], [1, 2], [3, 1]];
+    rows.forEach((y, i) => cols.forEach((x, j) => {
+      const g = G(arr, { o: 0, s: .5 });
+      mk('circle', { r: 11, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, g);
+      put(g, { x, y: y - 14, s: 1 });
+      if (conn.some(([r2, c2]) => r2 === i && c2 === j)) {
+        const d = mk('rect', { x: -8, y: -8, width: 16, height: 16, rx: 3, fill: LINK }, g);
+      }
+      pop(g, m('cell') + (i * 3 + j) * .1);
+    }));
+    const cellNote = text(p, 'transistor + mask-programmed connection', 740, 700, m('cell', 1.4), { size: 25, fill: COL.dim, anchor: 'middle' });
+    // activate row 1: connected cells pull their columns to 0
+    const r1 = path(arr, `M330 470H${cols[2] + 40}`, { stroke: CHG, 'stroke-width': 5 }, { d: 0 });
+    draw(r1, m('row'), .5);
+    const reads = {};
+    cols.forEach((x, j) => {
+      const is0 = conn.some(([r2, c2]) => r2 === 1 && c2 === j);
+      if (is0) { const e = path(arr, `M${x} 470V350`, { stroke: OFF, 'stroke-width': 5 }, { d: 0 }); draw(e, m('row', .6 + j * .2), .4); reads[j] = mline(p, '0', x, 320, m('row', 1 + j * .25), OFF, 34); }
+      else reads[j] = mline(p, '1', x, 320, m('row', 1 + j * .25), ON, 34);
+      pulse(reads[j], m('row', 1.3 + j * .25), 1.2);
+    });
+    hide(cellNote, m('row', 1.4), .4);
+    text(p, 'R1 active: a connection pulls the column to 0', 740, 700, m('row', 1.8), { size: 25, fill: COL.dim, anchor: 'middle' });
+    text(p, 'cheap only in huge quantities — and never changeable', 740, 790, D - 4, { size: 29, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  }],
+
+  ['prom', 'PROM: burn it once', (m, D) => {
+    const p = panel(0);
+    text(p, '1970 · Harris Semiconductor', 480, 170, .3, { size: 27, fill: COL.dim, anchor: 'middle', weight: 600 });
+    // a PROM cell: row line, transistor, fuse, column line
+    const cell = G(p, { o: 0 });
+    path(cell, 'M150 420H340', { stroke: COL.chalk, 'stroke-width': 3 });
+    mk('circle', { cx: 340, cy: 420, r: 12, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, cell);
+    path(cell, 'M340 432V520M328 520H352', { stroke: COL.chalk, 'stroke-width': 3 }, cell);   // transistor drain up
+    path(cell, 'M352 420H400M400 412V428', { stroke: COL.chalk, 'stroke-width': 3 }, cell);
+    mk('rect', { x: 406, y: 412, width: 40, height: 16, rx: 4, fill: LINK }, cell);
+    path(cell, 'M452 412V428M452 420H560', { stroke: COL.chalk, 'stroke-width': 3 }, cell);
+    path(cell, 'M560 420V240', { stroke: COL.chalk, 'stroke-width': 3 }, cell);
+    path(cell, 'M560 240l-6 -6 12 -9-12 -9 12 -9-6 -6', { stroke: COL.dim, 'stroke-width': 2.5, fill: 'none' });
+    show(cell, .8, .5);
+    text(p, 'PROM cell = transistor + fuse', 360, 620, 1.4, { size: 26, fill: COL.dim, anchor: 'middle' });
+    text(p, 'all fuses intact when the chip arrives', 360, 660, 2.2, { size: 23, fill: COL.dim, anchor: 'middle' });
+    // burn a fresh one and plug it in
+    const sock = G(p, { o: 0 });
+    mk('rect', { x: 850, y: 400, width: 300, height: 150, rx: 8, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, sock);
+    text(p, 'your board', 1000, 600, m('burn', -.8), { size: 24, fill: COL.dim, anchor: 'middle' });
+    show(sock, m('burn', -.8), .4);
+    const bad = G(p, { x: 1000, y: 300, o: 0, s: 1 });
+    mk('rect', { x: -110, y: -60, width: 220, height: 110, rx: 8, fill: 'none', stroke: OFF, 'stroke-width': 3.5 }, bad);
+    T(bad, 'design with a bug', { y: -20, size: 22, fill: OFF, anchor: 'middle' });
+    path(bad, 'M-16 8L16 40M16 8L-16 40', { stroke: OFF, 'stroke-width': 4 });
+    show(bad, m('burn', -.4), .4);
+    tw(bad, { y: 140, o: 0 }, m('burn', .4), .6);
+    const fresh = G(p, { x: 1000, y: 160, o: 0 });
+    mk('rect', { x: -110, y: -60, width: 220, height: 110, rx: 8, fill: 'none', stroke: LINK, 'stroke-width': 3.5 }, fresh);
+    T(fresh, 'fresh PROM', { y: -18, size: 24, fill: LINK, anchor: 'middle', weight: 600 });
+    bolt(p, 1160, 130, m('burn'), .8);
+    show(fresh, m('burn', .2), .4);
+    tw(fresh, { y: 260 }, m('burn', 1.5), .7, soft);
+    text(p, 'burn a fresh one, and plug it in', 1000, 620, m('burn', 2.2), { size: 27, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    text(p, 'also used as lookup tables and state machines', 740, 790, D - 5, { size: 27, fill: COL.dim, anchor: 'middle' });
+  }],
+
+  ['eprom', 'EPROM: the floating gate', (m, D) => {
+    const p = panel(0);
+    text(p, 'Intel 1702 · 1971', 250, 170, .3, { size: 27, fill: COL.dim, weight: 600 });
+    // cross-section
+    const cs = G(p, { o: 0 });
+    mk('rect', { x: 380, y: 580, width: 520, height: 70, fill: COL.faint, opacity: .3 }, cs);
+    mk('rect', { x: 410, y: 500, width: 130, height: 80, rx: 4, fill: COL.dim, opacity: .45 }, cs);
+    mk('rect', { x: 740, y: 500, width: 130, height: 80, rx: 4, fill: COL.dim, opacity: .45 }, cs);
+    path(cs, 'M380 490H900', { stroke: COL.dim, 'stroke-width': 2, 'stroke-dasharray': '8 7' });
+    mk('rect', { x: 500, y: 430, width: 280, height: 34, rx: 4, fill: 'none', stroke: CHG, 'stroke-width': 3.5 }, cs);
+    path(cs, 'M380 420H900', { stroke: COL.dim, 'stroke-width': 2, 'stroke-dasharray': '8 7' });
+    mk('rect', { x: 500, y: 356, width: 280, height: 40, rx: 4, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, cs);
+    show(cs, .6, .5);
+    const lab = (str, x, y, t0, colr = COL.dim) => text(p, str, x, y, t0, { size: 23, fill: colr });
+    lab('source', 475, 610, 1.1); lab('drain', 805, 610, 1.3);
+    lab('floating gate — isolated by oxide', 640, 310, 1.6, CHG);
+    lab('control gate', 640, 340, 2, COL.chalk);
+    // hot electrons inject onto the floating gate
+    text(p, '≈ 12 V', 870, 380, m('inject'), { size: 27, fill: CHG, weight: 600 });
+    const els = [];
+    for (let i = 0; i < 5; i++) {
+      const g = G(p, { o: 0, x: 770 + (i % 3) * 26, y: 520 });
+      mk('circle', { r: 5.5, fill: CHG }, g);
+      els.push(g);
+    }
+    els.forEach((g, i) => {
+      const t0 = m('inject', .4 + i * .3);
+      show(g, t0, .2);
+      tw(g, { x: 560 + (i % 5) * 40, y: 455 }, t0 + .1, .5, io);
+    });
+    const st1 = text(p, 'hot electrons force through the oxide', 640, 240, m('inject', 2.2), { size: 24, fill: CHG, anchor: 'middle', weight: 600 });
+    // the charge stays
+    hide(st1, m('stuck', .2), .3);
+    const st2 = text(p, 'stable for 10+ years — and it blocks the control gate', 640, 240, m('stuck', .4), { size: 24, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    els.forEach((g, i) => pulse(g, m('stuck', .2 + i * .12), 1.3));
+    // UV erases
+    const lamp = G(p, { x: 1150, y: 200, o: 0 });
+    mk('rect', { x: -60, y: -26, width: 120, height: 52, rx: 10, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, lamp);
+    T(lamp, 'UV', { size: 26, fill: CHG, anchor: 'middle', weight: 700 });
+    show(lamp, m('uv'), .4);
+    const rays = G(p, { o: 0 });
+    [[1010, 330], [1060, 400], [1110, 470]].forEach(([x, y]) => path(rays, `M1110 240L${x} ${y}`, { stroke: CHG, 'stroke-width': 2.5, 'stroke-dasharray': '7 7' }));
+    show(rays, m('uv', .4), .4);
+    els.forEach((g, i) => { tw(g, { y: 260 - i * 18, o: 0 }, m('uv', .8 + i * .15), .8, out); });
+    text(p, 'quartz window · ~20 minutes', 1150, 280, m('uv', .8), { size: 23, fill: COL.dim, anchor: 'middle' });
+    hide(st2, m('uv', 1.6), .3);
+    text(p, 'the light drains the electrons — blank again', 640, 240, m('uv', 1.8), { size: 24, fill: ON, anchor: 'middle', weight: 600 });
+    // the cycle
+    bolt(p, 1330, 620, D - 4, .7);
+    const cycLab = T(p, 'program', { x: 1330, y: 690, size: 22, fill: COL.dim, anchor: 'middle', o: 0 });
+    show(cycLab, D - 3.6, .3);
+    text(p, '→ erase → reprogram', 1330, 730, D - 3.2, { size: 22, fill: COL.dim, anchor: 'middle' });
+  }],
+
+  ['q2', 'Quick check', () => { panel(0); }, { ask: done => quiz(BAND, [{
+    id: 'c-otp', prompt: ['Erasable and reprogrammable — or one-time only?'],
+    build: grid([
+      { parts: ['fuse'], ans: ['otp'], why: 'A blown fuse never comes back: one-time only.' },
+      { parts: ['antifuse'], ans: ['otp'], why: 'A grown via cannot be removed: one-time only.' },
+      { parts: ['PROM'], ans: ['otp'], why: 'PROMs are fusible-link based: burn once, no changes.' },
+      { parts: ['EPROM'], ans: ['erase'], why: 'UV light drains the floating gate, and the cell is blank again.' },
+    ], [['otp', 'one-time', OFF], ['erase', 'erase & reuse', ON]], { multi: false }),
+  }], done) }],
+
+  ['flash', 'EEPROM and FLASH', (m, D) => {
+    const p = panel(0);
+    // EPROM cell vs EEPROM cell
+    const box1 = G(p, { o: 0 });
+    mk('rect', { x: 200, y: 300, width: 240, height: 130, rx: 10, fill: 'none', stroke: COL.dim, 'stroke-width': 3 }, box1);
+    mk('circle', { cx: 320, cy: 365, r: 16, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, box1);
+    show(box1, .3, .4);
+    const ecLab = text(p, 'EPROM cell — one transistor', 320, 470, .8, { size: 24, fill: COL.dim, anchor: 'middle' });
+    const box2 = G(p, { o: 0 });
+    mk('rect', { x: 200, y: 540, width: 600, height: 130, rx: 10, fill: 'none', stroke: COL.dim, 'stroke-width': 3 }, box2);
+    mk('circle', { cx: 330, cy: 605, r: 16, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, box2);
+    mk('circle', { cx: 640, cy: 605, r: 16, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, box2);
+    show(box2, 1.4, .4);
+    text(p, 'EEPROM cell — two transistors + erase transistor', 500, 710, 1.9, { size: 24, fill: COL.dim, anchor: 'middle' });
+    bolt(p, 850, 600, 6.2, .8);
+    text(p, 'erased electrically — no window, no lamp', 500, 750, 6.8, { size: 24, fill: ON, anchor: 'middle', weight: 600 });
+    // the price: 2.5× bigger
+    pulse(box2, m('cost'), 1.04);
+    mline(p, '≈ 2.5×', 320, 430, m('cost', .5), OFF, 40);
+    hide(ecLab, m('cost', .7), .3);
+    text(p, 'bigger than an EPROM cell', 320, 470, m('cost', .9), { size: 24, fill: OFF, anchor: 'middle' });
+    // FLASH: erase in blocks
+    for (let r = 0; r < 2; r++) for (let cc = 0; cc < 4; cc++) {
+      const g = G(p, { x: 1000 + cc * 110, y: 300 + r * 110, o: 0 });
+      mk('rect', { x: -45, y: -45, width: 90, height: 90, rx: 8, fill: 'none', stroke: COL.chalk, 'stroke-width': 3 }, g);
+      mk('circle', { cx: 0, cy: 0, r: 10, fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 }, g);
+      show(g, m('cost', 3) + (r * 4 + cc) * .07, .3);
+    }
+    text(p, 'FLASH: erase a whole block — fast, but all at once', 1220, 540, m('cost', 3.8), { size: 24, fill: COL.dim, anchor: 'middle' });
+    const wipe = G(p, { o: 0 });
+    mk('rect', { x: 955, y: 255, width: 210, height: 200, rx: 10, fill: 'none', stroke: CHG, 'stroke-width': 4, 'stroke-dasharray': '10 8' }, wipe);
+    show(wipe, m('cost', 4.6), .3); pulse(wipe, m('cost', 4.9), 1.06); hide(wipe, m('cost', 6), .5);
+    // two bits in one cell
+    const bit2 = G(p, { o: 0 });
+    mk('rect', { x: 1050, y: 620, width: 160, height: 160, rx: 12, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, bit2);
+    mk('circle', { cx: 1100, cy: 700, r: 9, fill: CHG }, bit2);
+    mk('circle', { cx: 1160, cy: 700, r: 9, fill: CHG }, bit2);
+    show(bit2, m('flash'), .4); pulse(bit2, m('flash', .4), 1.05);
+    text(p, 'two bits of charge in one cell', 1130, 830, m('flash', .8), { size: 24, fill: COL.chalk, anchor: 'middle', weight: 600 });
+  }],
+
+  ['sram', 'SRAM: today\u2019s FPGA', (m, D) => {
+    const p = panel(0);
+    // signal path with a pass transistor
+    path(p, 'M200 520H745M795 520H1300', { stroke: COL.chalk, 'stroke-width': 3 });
+    path(p, 'M745 500V540M795 500V540', { stroke: COL.chalk, 'stroke-width': 4 });
+    const blade = G(p, { x: 745, y: 505, r: -32 });
+    path(blade, 'M0 0H50', { stroke: ON, 'stroke-width': 5, fill: 'none' });
+    const gateLine = path(p, 'M770 400V560', { stroke: CFG, 'stroke-width': 3 });
+    // the latch
+    const latch = G(p, { o: 0 });
+    mk('rect', { x: 570, y: 250, width: 400, height: 150, rx: 12, fill: 'none', stroke: CFG, 'stroke-width': 3.5 }, latch);
+    path(latch, 'M650 285l30 30-30 30h-14', { fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 });   // two small inverters, drawn simply
+    path(latch, 'M890 285l-30 30 30 30h14', { fill: 'none', stroke: COL.dim, 'stroke-width': 2.5 });
+    text(p, 'SRAM latch · 4–6 transistors', 770, 430, .4, { size: 25, fill: CFG, anchor: 'middle' });
+    show(latch, .3, .5);
+    const val = mline(p, '1', 770, 340, m('cell'), CFG, 56);
+    pulse(val, m('cell', .3), 1.2);
+    // store 1 → conducts
+    tw(blade, { r: 0 }, m('cell', .8), .5, soft);
+    flow(p, 520, 210, 740, m('cell', 1.3), 2.2, 3);
+    flow(p, 520, 800, 1290, m('cell', 1.5), 3.2, 4);
+    const s1 = text(p, 'store 1 → the switch conducts', 770, 470, m('cell', 1.9), { size: 25, fill: ON, anchor: 'middle', weight: 600 });
+    // store 0 → off
+    tw(val, { o: 0 }, m('cell', 3.4), .3);
+    const val0 = mline(p, '0', 770, 340, m('cell', 3.7), COL.dim, 56);
+    tw(blade, { r: -32 }, m('cell', 4.1), .5, soft);
+    tw(gateLine, { c_stroke: COL.dim }, m('cell', 4.1), .5);
+    hide(s1, m('cell', 4.1), .3);
+    const s0 = text(p, 'store 0 → it is off', 770, 470, m('cell', 4.5), { size: 25, fill: COL.dim, anchor: 'middle' });
+    // reprogram again and again
+    for (let i = 0; i < 3; i++) {
+      const t0 = m('cell', 6 + i * 1.1);
+      tw(blade, { r: 0 }, t0, .25, soft); tw(blade, { r: -32 }, t0 + .5, .25, soft);
+    }
+    hide(s0, m('cell', 6), .3);
+    const sr = text(p, 'reprogrammed in milliseconds — again and again', 770, 470, m('cell', 6.2), { size: 25, fill: COL.chalk, anchor: 'middle', weight: 600 });
+    // volatile: power off
+    const pw = G(p, { x: 1010, y: 320, o: 0 });
+    mk('circle', { r: 20, fill: 'none', stroke: COL.chalk, 'stroke-width': 3.5 }, pw);
+    path(pw, 'M0 -30V-8', { stroke: COL.chalk, 'stroke-width': 3.5 });
+    show(pw, m('vol'), .3);
+    const pwX = path(p, 'M980 350L1040 290', { stroke: OFF, 'stroke-width': 4 }, { o: 0 });
+    show(pwX, m('vol', .8), .3);
+    tw(val0, { o: 0 }, m('vol', 1), .4);
+    mline(p, '?', 770, 340, m('vol', 1.4), OFF, 56);
+    tw(blade, { r: -32 }, m('vol', 1.6), .4, soft);
+    hide(sr, m('vol', 1.6), .3);
+    text(p, 'power off → the configuration is gone', 770, 470, m('vol', 2), { size: 25, fill: OFF, anchor: 'middle', weight: 600 });
+    // boot: load again at every power-up
+    icDie(p, 480, 680, 220, 150, m('vol', 6), true);
+    text(p, 'FPGA', 590, 870, m('vol', 6.4), { size: 24, fill: COL.dim, anchor: 'middle' });
+    icDie(p, 900, 680, 220, 150, m('vol', 6.6));
+    text(p, 'configuration memory', 1010, 870, m('vol', 6.8), { size: 24, fill: COL.dim, anchor: 'middle' });
+    const ld = path(p, 'M900 755H708', { stroke: CFG, 'stroke-width': 4 }, { d: 0 });
+    draw(ld, m('vol', 7.4), .5);
+    flow(p, 755, 890, 720, m('vol', 8), 2.5, 3, CFG);
+    text(p, 'at every power-up: load the configuration again', 770, 600, m('vol', 7.6), { size: 26, fill: CFG, anchor: 'middle', weight: 600 });
+    text(p, 'that is why an FPGA boots', 770, 640, m('vol', 8.6), { size: 26, fill: COL.chalk, anchor: 'middle' });
+  }],
+
+  ['wrap', 'Summary', (m) => {
+    const p = panel(0);
+    const rows = [
+      ['A programmable link is the atom of configurable logic — make it or break it, and the function is defined.', 'w1', LINK],
+      ['Fuses, antifuses, mask ROMs and PROMs: one-time programmable.', 'w2', OFF],
+      ['EPROM erases with ultraviolet light; EEPROM and FLASH erase electrically.', 'w3', CHG],
+      ['SRAM — volatile, instantly reprogrammable — powers almost every modern FPGA.', 'end', CFG],
+    ];
+    rows.forEach(([str, mark, colr], i) => {
+      const g = G(p, { x: -16, y: 230 + i * 150, o: 0 });
+      mk('circle', { cx: 210, cy: -12, r: 26, fill: colr }, g);
+      T(g, String(i + 1), { x: 210, y: -1, size: 30, fill: COL.board, weight: 700, anchor: 'middle' });
+      T(g, str, { x: 280, size: 33, weight: 500, fill: COL.chalk });
+      tw(g, { o: 1, x: 0 }, m(mark), .6);
+    });
+  }],
+
+  ['final1', 'Chapter practice', () => { panel(0); }, { ask: done => quiz(SCREEN, [
+    { id: 'p-class', prompt: ['Mark each technology: ', h('b', '', 'one-time only'), ', ', h('b', '', 'erase & reprogram'), ', or ', h('b', '', 'volatile too'), '.'],
+      build: grid([
+        { parts: ['mask ROM'], ans: ['otp'], why: 'The data is wired in by photo-masks at the factory: never changeable.' },
+        { parts: ['PROM'], ans: ['otp'], why: 'Fusible links: burn once, and there is no going back.' },
+        { parts: ['FLASH'], ans: ['erase'], why: 'FLASH erases electrically — in large blocks, fast — and remembers after power off.' },
+        { parts: ['SRAM cell'], ans: ['erase', 'vol'], why: 'SRAM reprograms in milliseconds, but it forgets when power is removed.' },
+      ], [['otp', 'one-time only', OFF], ['erase', 'erase & reprogram', ON], ['vol', 'volatile too', CHG]], { text: true }) },
+    { id: 'p-boot', prompt: ['Why must an SRAM-based FPGA load its configuration at every power-up?'],
+      build: choice([
+        'SRAM cells forget their contents when power is removed',
+        'The fuses regrow and must be blown again',
+        'Room light erases the floating gates',
+        'The pull-up resistors hold every input at one',
+      ], 0, 'Right: SRAM is volatile, so the configuration must be reloaded from an external memory each time.', [
+        null, 'Fuses never come back — that is exactly why they are one-time programmable.',
+        'Only ultraviolet light through a quartz window erases an EPROM — and SRAM cells have no floating gate.',
+        'Pull-ups set unconnected gate inputs to one; they have nothing to do with losing configuration at power-off.']) },
+    { id: 'p-grow', prompt: ['An antifuse device must implement ', h('b', '', 'y = !a & !b'), '. How many antifuse links must be grown?'],
+      build: blanks([{ parts: ['links to grow: ', { box: '2' }], why: 'Only !a and !b may connect to the gate — two grown vias.', hint: 'Count the signals that must reach the AND gate.' }]) },
+    { id: 'p-iterate', prompt: ['You are testing a design you expect to change many times a day. Which technology fits best?'],
+      build: choice([
+        'An SRAM-based FPGA — reprogrammed in milliseconds',
+        'An antifuse FPGA — one-time programmable',
+        'A mask-programmed ROM — wired at the factory',
+        'A fusible-link PROM — burn a fresh one each time',
+      ], 0, 'Right: SRAM devices reprogram quickly and repeatedly, even in a running system.', [
+        null, 'Each try would need a new, permanently programmed chip.',
+        'A mask ROM cannot be changed at all after manufacture.',
+        'A new PROM for every try works, but it is slow and wasteful next to SRAM.']) },
+  ], done, 'Chapter practice') }],
+
+  ['finish', 'Finished', () => { panel(0); }, { ask: finishCard }],
+].map(([id, title, run, extra]) => ({ id, title, run, ...extra }));
+
+boot();
+</script>
+</body>
+</html>
