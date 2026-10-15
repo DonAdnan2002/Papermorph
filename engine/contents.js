@@ -26,6 +26,16 @@ const Contents = (() => {
       chapterCount: { one: '{n} глава', few: '{n} главы', many: '{n} глав', other: '{n} главы' }, finished: 'Пройдено {done} из {n}',
       doneMark: '✓ Пройдено · ', lastMark: ' · Открыта последней',
     },
+    ar: {
+      open: 'افتح الكتاب', toCover: 'عودة إلى الغلاف', resume: 'متابعة · الفصل {n}', unit: 'الوحدة {n}', minutes: '{n} د',
+      meta: '{chapters}{samples} · {units} · بصوت',
+      metaChapters: { zero: 'لا فصول', one: 'فصل واحد', two: 'فصلان', few: '{n} فصول', many: '{n} فصلًا', other: '{n} فصل' },
+      metaUnits: { zero: 'لا وحدات', one: 'وحدة واحدة', two: 'وحدتان', few: '{n} وحدات', many: '{n} وحدة', other: '{n} وحدة' },
+      metaSamples: { one: ' + فصل تجريبي', two: ' + فصلان تجريبيان', few: ' + {n} فصول تجريبية', many: ' + {n} فصلًا تجريبيًا', other: ' + {n} فصل تجريبي' },
+      sampleUnit: ' · فصل تجريبي بنمط آخر',
+      chapterCount: { zero: 'لا فصول', one: 'فصل واحد', two: 'فصلان', few: '{n} فصول', many: '{n} فصلًا', other: '{n} فصل' }, finished: 'أُنجز {done} من {n}',
+      doneMark: '✓ أُنجز · ', lastMark: ' · آخر فصل مفتوح',
+    },
   };
   const LANGUAGE = (document.documentElement.lang || 'en').toLowerCase().split('-')[0];
   function translate(key, vars = {}) {

@@ -78,6 +78,43 @@ const TRANSLATIONS = {
     firstTryScore: '{name}: {r} из {t} верно с первой попытки.', notAttempted: '{name}: не выполнялось.',
     watchAgain: 'Смотреть снова', nextChapter: 'Следующая глава',
   },
+  ar: {
+    decimalSign: '.', stageLabel: 'رسوم الدرس', stageLabelTitled: 'رسوم الدرس: {title}',
+    shortcuts: 'اختصارات لوحة المفاتيح', lesson: 'الدرس', questions: 'الأسئلة',
+    helpPlay: 'تشغيل أو إيقاف مؤقت', helpStep: 'الخطوة السابقة أو التالية', helpStepInQuestion: 'تغيير الخطوة أثناء سؤال', helpRestart: 'البدء من جديد',
+    helpCaptions: 'إظهار الترجمة أو إخفاءها', helpSpeed: 'أبطأ أو أسرع', helpFullScreen: 'ملء الشاشة', helpList: 'عرض هذه القائمة',
+    helpChoose: 'اختر إجابة أو حلقة', helpTrueFalse: 'صح أم خطأ', helpRows: 'التنقل بين الصفوف',
+    helpNumberLine: 'التحرك على خط الأعداد، أو اختر عددًا للفرز', helpEnter: 'تحقّق، ثم تابع',
+    helpShowAnswer: 'إظهار الإجابة', helpLeaveBox: 'مغادرة مربع الإجابة', helpClose: 'اضغط {key} للإغلاق.',
+    paused: 'إيقاف مؤقت. اضغط المسافة أو انقر للمتابعة.',
+    soundFailed: 'تعذّر تشغيل الصوت. سيتابع الدرس بالنص المعروض على الشاشة.',
+    startLesson: 'ابدأ الدرس', coverKeys: 'اضغط {space} للبدء، و{help} للاختصارات.', spaceKey: 'المسافة',
+    chapterNumber: 'الفصل {n}',
+    aboutMinutes: { zero: 'أقل من دقيقة، بصوت وتحققات سريعة.', one: 'نحو دقيقة واحدة، بصوت وتحققات سريعة.', two: 'نحو دقيقتين، بصوت وتحققات سريعة.',
+      few: 'نحو {n} دقائق، بصوت وتحققات سريعة.', many: 'نحو {n} دقيقة، بصوت وتحققات سريعة.', other: 'نحو {n} دقيقة، بصوت وتحققات سريعة.' },
+    allChapters: 'كل الفصول', playLabel: 'تشغيل أو إيقاف مؤقت (المسافة)', backLabel: 'الخطوة السابقة (سهم يسار)', restartLabel: 'إعادة الدرس من البداية',
+    volumeLabel: 'ضبط مستوى الصوت', volumeTitle: 'مستوى الصوت (0 = كتم)', volumeSlider: 'الصوت',
+    helpLabel: 'اختصارات لوحة المفاتيح (?)', speedLabel: 'سرعة التشغيل (< و >)', captionsLabel: 'الترجمة (C)', fullScreenLabel: 'ملء الشاشة', goToStep: 'الانتقال إلى الخطوة {n}: {title}',
+    quickCheck: 'تحقّق سريع', countOf: '{k} من {n}', check: 'تحقّق', showAnswer: 'إظهار الإجابة', nextQuestion: 'السؤال التالي', continue: 'متابعة',
+    correct: 'صحيح. ', notQuite: 'ليس تمامًا. ', answerPrefix: 'الإجابة: ', keysPrefix: 'المفاتيح: ',
+    hintMove: ' تحرّك، ', hintChoose: ' اختر', hintChooseOrClickGrid: ' اختر أو انقر الجدول', hintMoveAlongLine: ' تحرّك على الخط، ',
+    hintChooseOrClick: ' اختر أو انقر', hintRow: ' صف، ', hintTypeFraction: 'اكتب أعدادًا مثل 3/4 أو −2 1/4، ', hintTypeNumber: 'اكتب العدد، ',
+    hintTypeDecimal: 'اكتب العدد، ', hintNextBox: ' المربع التالي، ', hintCheck: ' تحقّق، ', hintLeaveBox: ' غادر المربع',
+    hintPickNumber: ' اختر عددًا، ', hintPickRing: ' اختر حلقة العدد',
+    rowsRight: 'أصبت {r} من {n}. صحّح الصفوف المعلّمة بـ ✗ ثم تحقّق مجددًا.',
+    choicesShown: 'الخيارات الصحيحة أصبحت محددة.', numbersShown: 'الأعداد الصحيحة أصبحت مكتوبة.',
+    notPlacedYet: '{x}: لم يُوضَع بعد.',
+    realRingIsEmpty: '{x}: كل عدد حقيقي إما نسبي أو غير نسبي، فلا أعداد خاصة بهذه المنطقة.',
+    ringsRight: '{r} من {n} في الحلقة الصحيحة.', ringsShown: 'كل عدد الآن في أصغر حلقة له.',
+    chipPlaced: '{x}، في حلقة {ring}', chipNotPlaced: '{x}، غير موضَع', pointLabel: 'النقطة {v}', answerBox: 'الإجابة',
+    stepsLeftOfZero: { zero: 'عند الصفر تمامًا', one: 'خطوة واحدة يسار الصفر', two: 'خطوتان يسار الصفر',
+      few: '{n} خطوات يسار الصفر', many: '{n} خطوة يسار الصفر', other: '{n} خطوة يسار الصفر' },
+    natural: 'طبيعية', whole: 'صحيحة غير سالبة', integers: 'صحيحة', rational: 'نسبية', irrational: 'غير نسبية', real: 'حقيقية', integerColumn: 'صحيح',
+    trueLabel: 'صح', falseLabel: 'خطأ',
+    chapterComplete: 'أُنجز الفصل {n}', quickChecks: 'التحققات السريعة', chapterPractice: 'تدريب الفصل',
+    firstTryScore: '{name}: {r} من {t} صحيحة من المحاولة الأولى.', notAttempted: '{name}: لم يُجرَّب.',
+    watchAgain: 'شاهد مجددًا', nextChapter: 'الفصل التالي',
+  },
 };
 const LANGUAGE = (document.documentElement.lang || 'en').toLowerCase().split('-')[0];
 const pluralRules = {};
@@ -179,11 +216,12 @@ document.body.insertAdjacentHTML('afterbegin', `<div id="frame">
 const NS = 'http://www.w3.org/2000/svg';
 const COL = { nat: '#f4a48c', whole: '#86c9e8', int: '#f3c95c', rat: '#e8a0c8', irr: '#8fd6b0', real: '#bba8ee',
   chalk: '#ece8dc', dim: '#9aaba3', faint: '#5d7068', task: '#f0b45a', good: '#8fd6b0', bad: '#f08c7a', board: '#1d2b27' };
-const UI = '"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif';
-// Book settings (lib/book.css, next to engine.css and imported by it): --math-font for numbers and formulas,
+// Book settings (lib/book.css, next to engine.css and imported by it): --ui-font for the interface text
+// (an Arabic webfont, for instance), --math-font for numbers and formulas,
 // --progress-key for the localStorage key the cover and chapters share.
 const BOOK = getComputedStyle(document.documentElement);
 const bookSetting = name => BOOK.getPropertyValue(name).trim().replace(/^(["'])([^"']*)\1$/, '$2');   // unquote a lone string only
+const UI = bookSetting('--ui-font') || '"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif';
 const MATH = bookSetting('--math-font') || '"STIX Two Text","Cambria Math","Iowan Old Style",Palatino,Georgia,serif';
 const NAME = { nat: translate('natural'), whole: translate('whole'), int: translate('integers'), rat: translate('rational'), irr: translate('irrational'), real: translate('real') };
 // Card positions inside the 1600×900 picture.

@@ -77,3 +77,8 @@
   .unit-art .shade { opacity: .14; }
   .unit-art .pie { stroke-dasharray: 25 100; }
 }
+
+/* ---------- right-to-left (dir="rtl" on <html>) ---------- */
+[dir='rtl'] .unit-art { right: auto; left: 28px; }
+[dir='rtl'] .unit h2 .label { letter-spacing: 0; }
+@media (max-width: 560px) { [dir='rtl'] .unit-art { right: auto; left: 16px; } }

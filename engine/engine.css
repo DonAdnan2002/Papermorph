@@ -4,7 +4,7 @@
   --page: #0f1613; --board: #1d2b27; --panel: #22322d; --edge: #3a5047;
   --chalk: #ece8dc; --dim: #9aaba3; --faint: #5d7068;
   --task: #f0b45a; --quiz: #86c9e8; --good: #8fd6b0; --bad: #f08c7a;
-  --ui: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --ui: var(--ui-font, "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -233,3 +233,29 @@ a.btn { text-decoration: none; display: inline-block; }
 .fin .kicker { font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
 .fin .prompt { margin: 6px 0 14px; font: 500 56px/1.15 "Iowan Old Style", Palatino, Georgia, serif; }
 .icon.speed { width: auto; min-width: 44px; padding: 0 10px; border-radius: 22px; font-size: 16px; }
+
+/* ---------- right-to-left (dir="rtl" on <html>): mirror the physical directions. Arabic letters must
+   join, so the tracking on kickers is off; typed answers stay Latin-math, so their boxes stay LTR. ---------- */
+[dir='rtl'] .card { border-left-width: 1.5px; border-right: 7px solid var(--quiz); }
+[dir='rtl'] .side .mascot { float: left; margin: -2px 10px 6px -4px; }
+[dir='rtl'] .grid .row { padding: 5px 12px 5px 0; }
+[dir='rtl'] .grid .num { justify-content: flex-start; }
+[dir='rtl'] .grid.text .num { justify-content: flex-end; }
+[dir='rtl'] .grid .why { padding-left: 0; padding-right: 186px; }
+[dir='rtl'] .screen .grid .row { padding: 9px 12px 9px 0; }
+[dir='rtl'] .screen .grid .why { padding-left: 0; padding-right: 216px; }
+[dir='rtl'] .grid .row.cur { box-shadow: inset -4px 0 var(--quiz); }
+[dir='rtl'] .step { text-align: left; }
+[dir='rtl'] .seg i { left: auto; right: 0; }
+[dir='rtl'] .fb ul { padding-left: 0; padding-right: 22px; }
+[dir='rtl'] kbd { margin-left: 0; margin-right: .5em; }
+[dir='rtl'] .opt kbd { margin: 0 0 0 .6em; }
+[dir='rtl'] .blanks .mark { margin-left: 0; margin-right: 14px; }
+[dir='rtl'] .help dt { text-align: left; padding-left: 18px; padding-right: 0; }
+[dir='rtl'] .screen .acts { left: 70px; right: auto; }
+[dir='rtl'] .screen.sort .head, [dir='rtl'] .screen.sort .acts { left: 34px; right: auto; }
+[dir='rtl'] .screen.sort .fb { left: 34px; right: auto; }
+[dir='rtl'] .sound-note { left: auto; right: 24px; }
+[dir='rtl'] .cover-k, [dir='rtl'] .fin .kicker { letter-spacing: 0; }
+[dir='rtl'] .box { direction: ltr; }
+@media (max-width: 700px) { [dir='rtl'] #bar { transform-origin: right top; } }

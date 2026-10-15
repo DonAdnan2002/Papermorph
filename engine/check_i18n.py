@@ -27,7 +27,7 @@ TEMPLATES = SKILL / "assets/templates"
 TIMING = {"dur": 30, "marks": {"sub": 1, "note": 2, "w1": 3, "w2": 4}, "cues": []}
 TIMINGS = "const TIMINGS = " + json.dumps({beat: TIMING for beat in ("intro", "idea", "q1", "wrap", "final1", "finish")})
 # Page variants: (html lang, engine and book template from BASE_REF instead of the working tree).
-VARIANTS = {"base": ("en", True), "en": ("en", False), "ru": ("ru", False), "de": ("de", False)}
+VARIANTS = {"base": ("en", True), "en": ("en", False), "ru": ("ru", False), "de": ("de", False), "ar": ("ar", False)}
 
 
 def at_base_ref(path):
@@ -54,7 +54,8 @@ BASE_FILES = {"book": at_base_ref(TEMPLATES / "book.html"), **{name: engine_at_b
 
 
 def with_language(html, language):
-    return html.replace('<html lang="en">', f'<html lang="{language}">', 1)
+    rtl = ' dir="rtl"' if language == 'ar' else ''
+    return html.replace('<html lang="en">', f'<html lang="{language}"{rtl}>', 1)
 
 
 async def answer(route):
@@ -271,6 +272,74 @@ async def check_russian_book(browser, errors):
     await page.close()
 
 
+async def check_arabic_lesson(browser, errors):
+    page = await open_lesson(browser, "ar", errors)
+    text = lambda selector: page.locator(selector).first.text_content()
+    assert await page.evaluate("document.documentElement.dir") == "rtl", "the Arabic page is right-to-left"
+    await page.locator("#cover").click()   # keys only act once the lesson has started
+    await page.wait_for_function("P.started && P.audio.currentTime > .1")
+    assert await text("#coverK") == "الفصل 1"
+    assert "ابدأ الدرس" in await text("#cover .go")
+    assert await page.locator("#help h2").text_content() == "اختصارات لوحة المفاتيح"
+    assert await page.locator(".paused-mark").text_content() == "إيقاف مؤقت. اضغط المسافة أو انقر للمتابعة."
+    for role, name in (("button", "ضبط مستوى الصوت"), ("slider", "الصوت"), ("button", "الترجمة (C)"),
+                       ("button", "تشغيل أو إيقاف مؤقت (المسافة)"), ("link", "كل الفصول"), ("button", "الانتقال إلى الخطوة 3: Quick check")):
+        assert await page.get_by_role(role, name=name, exact=True).count() == 1, f"no {role} named {name!r}"
+
+    # Arabic plural forms, and numbers that stay Western digits with a dot.
+    assert await page.evaluate("""[1, 3, 8, 11, 100].map(n => translate('aboutMinutes', { n })).join('|')""") == (
+        "نحو دقيقة واحدة، بصوت وتحققات سريعة.|نحو 3 دقائق، بصوت وتحققات سريعة.|نحو 8 دقائق، بصوت وتحققات سريعة.|"
+        "نحو 11 دقيقة، بصوت وتحققات سريعة.|نحو 100 دقيقة، بصوت وتحققات سريعة.")
+    assert await page.evaluate("num(2.5) === '2.5' && num(-3) === '−3'")
+    assert await page.evaluate("rat('0.75').join() === '75,100' && rat('0,75') === null"), "the decimal sign stays a dot"
+
+    # Shortcuts on an Arabic layout: the physical key carries the letter, layout-independent.
+    assert await page.evaluate("""isShortcut({ key: 'س', code: 'KeyC' }, 'c') && isShortcut({ key: 'C', code: 'KeyC' }, 'c')
+      && !isShortcut({ key: 'ب', code: 'KeyF' }, 'c')"""), "layout-independent letters"
+
+    # Mirrored cards: the accent border is on the right.
+    await page.evaluate("seek(2, false)")
+    await page.wait_for_timeout(300)
+    assert await text(".card .kicker") == "تحقّق سريع"
+    widths = await page.locator(".card.quiz").evaluate(
+        "e => [getComputedStyle(e).borderRightWidth, getComputedStyle(e).borderLeftWidth].map(parseFloat)")
+    assert widths == [7, 1.5] or widths == [7, 1], f"card border not mirrored: {widths}"
+    await page.locator(".box").fill("7")
+    await page.locator(".box").press("Enter")
+    await page.wait_for_timeout(200)
+    assert (await text(".card .fb")).startswith("صحيح."), "a right answer in Arabic"
+
+    # Finish card, R on an Arabic layout.
+    await page.evaluate("seek(BEATS.length - 1, false)")
+    await page.wait_for_timeout(300)
+    card = await text(".card")
+    for line in ("أُنجز الفصل 1", "التحققات السريعة: 1 من 1 صحيحة من المحاولة الأولى.", "تدريب الفصل: لم يُجرَّب.", "كل الفصول", "شاهد مجددًا"):
+        assert line in card, f"finish card lacks {line!r}"
+    await press(page, "ق", "KeyR")
+    await page.wait_for_function("P.i === 0")
+    print("PASS Arabic lesson: RTL page, cover, help, bar labels, plurals, numbers, Arabic-layout keys, mirrored card, finish card")
+    await page.close()
+
+
+async def check_arabic_book(browser, errors):
+    page = await open_page(browser, "ar/", errors)
+    text = lambda selector: page.locator(selector).first.text_content()
+    assert (await text("#cover .btn.go")).startswith("افتح الكتاب")
+    assert await text("#meta") == "فصل واحد · وحدة واحدة · بصوت"
+    assert await text("#prog") == "فصل واحد"
+    assert await text(".unit h2 span") == "الوحدة 1"
+    assert await text(".ch small") == "8 د"
+    await page.evaluate("localStorage.setItem('animebook:progress:/__i18n__/ar/', JSON.stringify({ done: [1], last: 1 }))")
+    await page.reload()
+    assert await text("#prog") == "أُنجز 1 من 1"
+    assert await text("#resume") == "متابعة · الفصل 1"
+    marks = await page.locator(".ch").first.evaluate(
+        "e => [getComputedStyle(e.querySelector('small'), '::before').content, getComputedStyle(e.querySelector('small'), '::after').content].join('|')")
+    assert marks == '"✓ أُنجز · "|" · آخر فصل مفتوح"', marks
+    print("PASS Arabic cover and contents: buttons, plurals, progress, marks")
+    await page.close()
+
+
 async def main():
     errors = []
     async with async_playwright() as playwright:
@@ -278,6 +347,8 @@ async def main():
         await check_english_unchanged(browser, errors)
         await check_russian_lesson(browser, errors)
         await check_other_language(browser, errors)
+        await check_arabic_lesson(browser, errors)
+        await check_arabic_book(browser, errors)
         await check_russian_book(browser, errors)
         await browser.close()
     assert not errors, errors

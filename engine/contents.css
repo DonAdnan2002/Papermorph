@@ -113,3 +113,8 @@ main#contents { padding-bottom: 80px; }
   *, *::before, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; transition: none !important; }
   .chalk span { opacity: .075; }
 }
+
+/* ---------- right-to-left (dir="rtl" on <html>) ---------- */
+[dir='rtl'] .kicker, [dir='rtl'] h1, [dir='rtl'] .meta { letter-spacing: 0; }
+[dir='rtl'] .prog { margin-left: 0; margin-right: auto; }
+[dir='rtl'] .ch { border-left-width: 1.5px; border-right: 6px solid var(--c); padding: 16px 16px 14px 18px; }
